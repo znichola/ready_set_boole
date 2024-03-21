@@ -1,7 +1,7 @@
 module Adder where
 
-import Data.Bits
-import Data.Word
+import Data.Bits (shiftL, xor, (.&.))
+import Data.Word (Word32)
 
 -- haskell Word32 is equal to c unsigned long
 

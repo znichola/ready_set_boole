@@ -1,7 +1,7 @@
 module Multiplier where
 
-import Data.Bits
-import Data.Word
+import Data.Bits (shiftL, shiftR, xor, (.&.))
+import Data.Word (Word32)
 
 multiplier :: Word32 -> Word32 -> Word32
 multiplier = go 0
