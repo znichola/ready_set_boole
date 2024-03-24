@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
-module Eval_formula where
+module Main where
 
 import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
 
