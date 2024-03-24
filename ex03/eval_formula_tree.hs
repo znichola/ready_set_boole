@@ -1,10 +1,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 module Eval_formula where
 
 import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
 
 data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
+
+eval_formula s = f $ evalTree $ head $ parseTree s
 
 printTree Empty = ""
 printTree (Node value Empty Empty) = [value]
