@@ -1,18 +1,25 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use camelCase" #-}
 
-import Data.Bits (Bits(complement, (.&.), (.|.), xor))
+module Eval_formula where
 
-data Op a = Unary (a -> a) | Binary (a -> a -> a)
-data Data a b = Root a | Leaf b deriving (Show)
+import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
+
 data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
-
 
 printTree Empty = ""
 printTree (Node value Empty Empty) = [value]
 printTree (Node value left right) = "(" ++ printTree right ++ " " ++ [value] ++ " " ++ printTree left ++ ")"
 
-eval_formula = head . go []
+evalTree Empty = error "wtf"
+evalTree (Node value Empty Empty) = value
+evalTree (Node '!' l _) = t $ complement (f $ evalTree l)
+evalTree (Node '&' l r) = t $ (.&.) (f $ evalTree l) (f $ evalTree r)
+evalTree (Node '|' l r) = t $ (.|.) (f $ evalTree l) (f $ evalTree r)
+evalTree (Node '^' l r) = t $ xor (f $ evalTree l) (f $ evalTree r)
+evalTree (Node '>' l r) = t $ (.|.) (complement $ f $ evalTree l) (f $ evalTree r)
+evalTree (Node '=' l r) = t $ (==) (f $ evalTree l) (f $ evalTree r)
+
+parseTree = go []
   where
     go stack [] = stack
     go stack (c : xc) = go (parsOp c stack) xc
@@ -29,4 +36,6 @@ parsOp '>' (a : b : xab) = Node '>' a b : xab
 parsOp '=' (a : b : xab) = Node '=' a b : xab
 parsOp c _               = error ("unknown charaster \'" ++ [c] ++ "\' found")
 
-materialCondition a b = complement a .|. b
+t b = if b then '1' else '0'
+f '1' = True
+f '0' = False
