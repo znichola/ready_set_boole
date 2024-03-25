@@ -1,11 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use camelCase" #-}
-{-# HLINT ignore "Eta reduce" #-}
-{-# HLINT ignore "Use &&" #-}
-
-module Eval_formula where
-
 import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
 
 eval_formula :: [Char] -> [Bool]

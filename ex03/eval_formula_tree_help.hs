@@ -1,33 +1,21 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use camelCase" #-}
-
 module Main where
 
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
-data Data a b = Branch a | Leaf b
-
 data Tree a = Empty | Node a (Tree a) (Tree a)
 
-instance (Show a) => Show (Tree a) where
-  show Empty = ""
-  show (Node value Empty Empty) = stripQuotes $ show value
-  show (Node value left right) = "(" ++ show right ++ " " ++ stripQuotes (show value) ++ " " ++ show left ++ ")"
+data Packet a b = Branch a | Leaf b
 
 data Op = Not | And | Or | Xor | Imply | Equal
 
-instance Show Op where
-  show Not = "!"
-  show And = "&"
-  show Or = "|"
-  show Xor = "^"
-  show Imply = ">"
-  show Equal = "="
+eval_formula = evalTree . checkParsing . parseTree
+  where
+    checkParsing [x] = x
+    checkParsing _ = error "stack should only contain one element"
 
-instance (Show a, Show b) => Show (Data a b) where
-  show (Leaf value) = show value
-  show (Branch value) = show value
+evalTree Empty = error "cannot evaluate empty node"
+evalTree (Node (Leaf value) _ _) = value
+evalTree (Node (Branch op) a b) = eval op (evalTree a) (evalTree b)
 
 eval Not = opposit where opposit a _ = complement a
 eval And = (.&.)
@@ -35,10 +23,6 @@ eval Or = (.|.)
 eval Xor = xor
 eval Imply = materialCondition where materialCondition a b = complement a .|. b
 eval Equal = (==)
-
-evalTree Empty = error "wtf"
-evalTree (Node (Leaf value) _ _) = value
-evalTree (Node (Branch op) a b) = eval op (evalTree a) (evalTree b)
 
 parseTree = go []
   where
@@ -57,15 +41,29 @@ parsOp '>' (a : b : xab) = Node (Branch Imply) a b : xab
 parsOp '=' (a : b : xab) = Node (Branch Equal) a b : xab
 parsOp c _               = error ("unknown charaster \'" ++ [c] ++ "\' found")
 
-eval_formula = evalTree . checkParsing . parseTree
-  where
-    checkParsing [x] = x
-    checkParsing _ = error "stack should only contain one element"
-
 main = do
   let tr = parseTree "1011|&="
   print tr
   print $ eval_formula "1011|&="
+
+-- helpter function for printing the tree
+
+instance (Show a) => Show (Tree a) where
+  show Empty = ""
+  show (Node value Empty Empty) = stripQuotes $ show value
+  show (Node value left right) = "(" ++ show right ++ " " ++ stripQuotes (show value) ++ " " ++ show left ++ ")"
+
+instance Show Op where
+  show Not = "!"
+  show And = "&"
+  show Or = "|"
+  show Xor = "^"
+  show Imply = ">"
+  show Equal = "="
+
+instance (Show a, Show b) => Show (Packet a b) where
+  show (Leaf value) = show value
+  show (Branch value) = show value
 
 stripQuotes [] = []
 stripQuotes "\"" = []

@@ -1,13 +1,13 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use camelCase" #-}
-
-module Eval_formula where
-
-import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
+import Data.Bits (Bits((.|.), (.&.), xor, complement))
 
 data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
 
-eval_formula s = f $ evalTree $ head $ parseTree s
+eval_formula = f . evalTree . head . parseTree
+
+parseTree = go []
+  where
+    go stack [] = stack
+    go stack (c : xc) = go (parsOp c stack) xc
 
 printTree Empty = ""
 printTree (Node value Empty Empty) = [value]
@@ -22,11 +22,6 @@ evalTree (Node '^' l r) = t $ xor (f $ evalTree l) (f $ evalTree r)
 evalTree (Node '>' l r) = t $ (.|.) (complement $ f $ evalTree l) (f $ evalTree r)
 evalTree (Node '=' l r) = t $ (==) (f $ evalTree l) (f $ evalTree r)
 
-parseTree = go []
-  where
-    go stack [] = stack
-    go stack (c : xc) = go (parsOp c stack) xc
-
 parsOp '1' x             = Node '1' Empty Empty : x
 parsOp '0' x             = Node '0' Empty Empty : x
 parsOp _ []              = error "no value to do op with"
@@ -40,5 +35,6 @@ parsOp '=' (a : b : xab) = Node '=' a b : xab
 parsOp c _               = error ("unknown charaster \'" ++ [c] ++ "\' found")
 
 t b = if b then '1' else '0'
+
 f '1' = True
 f '0' = False
