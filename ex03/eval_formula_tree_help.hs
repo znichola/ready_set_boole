@@ -1,15 +1,16 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use camelCase" #-}
 
 module Main where
 
-import Data.Bits ( Bits((.|.), (.&.), xor, complement) )
-import System.Win32 (xBUTTON1)
+import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
 data Data a b = Branch a | Leaf b
+
 data Tree a = Empty | Node a (Tree a) (Tree a)
 
-instance Show a => Show (Tree a) where
+instance (Show a) => Show (Tree a) where
   show Empty = ""
   show (Node value Empty Empty) = stripQuotes $ show value
   show (Node value left right) = "(" ++ show right ++ " " ++ stripQuotes (show value) ++ " " ++ show left ++ ")"
@@ -18,7 +19,7 @@ data Op = Not | And | Or | Xor | Imply | Equal
 
 instance Show Op where
   show Not = "!"
-  show And = "∧"
+  show And = "&"
   show Or = "|"
   show Xor = "^"
   show Imply = ">"
@@ -28,11 +29,11 @@ instance (Show a, Show b) => Show (Data a b) where
   show (Leaf value) = show value
   show (Branch value) = show value
 
-eval Not = opposit
-eval And  = (.&.)
+eval Not = opposit where opposit a _ = complement a
+eval And = (.&.)
 eval Or = (.|.)
 eval Xor = xor
-eval Imply = materialCondition
+eval Imply = materialCondition where materialCondition a b = complement a .|. b
 eval Equal = (==)
 
 evalTree Empty = error "wtf"
@@ -59,20 +60,16 @@ parsOp c _               = error ("unknown charaster \'" ++ [c] ++ "\' found")
 eval_formula = evalTree . checkParsing . parseTree
   where
     checkParsing [x] = x
-    checkParsing _ = error "stack is not empty"
+    checkParsing _ = error "stack should only contain one element"
 
 main = do
   let tr = parseTree "1011|&="
   print tr
   print $ eval_formula "1011|&="
 
-materialCondition a b = complement a .|. b
-
-opposit a _ = complement a
-
 stripQuotes [] = []
 stripQuotes "\"" = []
 stripQuotes "\'" = []
-stripQuotes ('\"':xs) = stripQuotes xs
-stripQuotes ('\'':xs) = stripQuotes xs
-stripQuotes (x:xs) = x : stripQuotes xs
+stripQuotes ('\"' : xs) = stripQuotes xs
+stripQuotes ('\'' : xs) = stripQuotes xs
+stripQuotes (x : xs) = x : stripQuotes xs
