@@ -8,10 +8,7 @@ data Packet a b = Branch a | Leaf b
 
 data Op = Not | And | Or | Xor | Imply | Equal
 
-eval_formula = evalTree . checkParsing . parseTree
-  where
-    checkParsing [x] = x
-    checkParsing _ = error "stack should only contain one element"
+eval_formula = evalTree . parsTree
 
 evalTree Empty = error "cannot evaluate empty node"
 evalTree (Node (Leaf value) _ _) = value
@@ -24,16 +21,17 @@ eval Xor = xor
 eval Imply = materialCondition where materialCondition a b = complement a .|. b
 eval Equal = (==)
 
-parseTree = go []
+parsTree = head . go []
   where
-    go stack [] = stack
+    go [t] [] = [t]
+    go _ [] = error "stack should only contain one element at the end"
     go stack (c : xc) = go (parsOp c stack) xc
 
 parsOp '1' x             = Node (Leaf True) Empty Empty : x
 parsOp '0' x             = Node (Leaf False) Empty Empty : x
-parsOp _ []              = error "no value to do op with"
+parsOp op []             = error ("no value to do op \'" ++ [op] ++ "\'")
 parsOp '!' (a : xa)      = Node (Branch Not) a Empty : xa
-parsOp _ [_]             = error "not enough values to do op"
+parsOp op [_]            = error ("not enough values to do op \'" ++ [op] ++ "\'")
 parsOp '&' (a : b : xab) = Node (Branch And) a b : xab
 parsOp '|' (a : b : xab) = Node (Branch Or) a b : xab
 parsOp '^' (a : b : xab) = Node (Branch Xor) a b : xab
@@ -42,16 +40,20 @@ parsOp '=' (a : b : xab) = Node (Branch Equal) a b : xab
 parsOp c _               = error ("unknown charaster \'" ++ [c] ++ "\' found")
 
 main = do
-  let tr = parseTree "1011|&="
-  print tr
-  print $ eval_formula "1011|&="
+  let expr = "1011||="
+  putStrLn $ printTree $ parsTree expr
+  print $ eval_formula expr
 
--- helpter function for printing the tree
+-- helpter functions for printing the tree
+
+printTree Empty = ""
+printTree (Node (Leaf v) _ _) = if v then "1" else "0"
+printTree (Node (Branch op) l r) = "(" <> printTree l <> show op <> printTree r <>")"
 
 instance (Show a) => Show (Tree a) where
   show Empty = ""
   show (Node value Empty Empty) = stripQuotes $ show value
-  show (Node value left right) = "(" ++ show right ++ " " ++ stripQuotes (show value) ++ " " ++ show left ++ ")"
+  show (Node value left right) = "(" <> show right <> " " <> stripQuotes (show value) <> " " <> show left <> ")"
 
 instance Show Op where
   show Not = "!"
@@ -66,8 +68,4 @@ instance (Show a, Show b) => Show (Packet a b) where
   show (Branch value) = show value
 
 stripQuotes [] = []
-stripQuotes "\"" = []
-stripQuotes "\'" = []
-stripQuotes ('\"' : xs) = stripQuotes xs
-stripQuotes ('\'' : xs) = stripQuotes xs
-stripQuotes (x : xs) = x : stripQuotes xs
+stripQuotes (x : xs) = if x `elem` "\'\"" then [] else [x] <> stripQuotes xs
