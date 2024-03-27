@@ -67,5 +67,8 @@ instance (Show a, Show b) => Show (Packet a b) where
   show (Leaf value) = show value
   show (Branch value) = show value
 
-stripQuotes [] = []
-stripQuotes (x : xs) = if x `elem` "\'\"" then [] else [x] <> stripQuotes xs
+stripQuotes = foldr (\ x -> (<>) ([x | x `notElem` "\'\""])) []
+-- below is what i wrote, but after accepting a series of
+-- hlint proposals I got the above
+-- stripQuotes [] = []
+-- stripQuotes (x : xs) = (if x `elem` "\'\"" then [] else [x] ) <> stripQuotes xs
