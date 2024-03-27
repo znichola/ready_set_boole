@@ -50,6 +50,25 @@ eval '^' = xor
 eval '>' = materialCondition where materialCondition a b = complement a .|. b
 eval '=' = (==)
 
+-- test variables
+
+t = parseTree "AB&"
+v = evalVariableTable t
+b = genBoolTable $ length v
+
+-- utility functions
+
+getValBoolTable val hdr = getCol (findVal val hdr)
+
+getCol n = map (!! n)
+
+findVal val = go 0
+  where
+    go acc [] = error ("Value " <> show val <> " not in list")
+    go acc (x:xs)
+      | x == val = acc
+      | otherwise = go (acc + 1) xs
+
 -- printing functions
 
 printTree Empty = ""
