@@ -37,6 +37,7 @@ parseOp c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 evalTree _ _ Empty = error "Cannot evaluate empty node"
 evalTree varList boolTable (Node (Value val) _ _) = getValBoolTable val varList boolTable
+evalTree varList boolTable (Node (Op '!') a _) = zipWith (eval '!') (evalTree varList boolTable a) (replicate (length boolTable) False)
 evalTree varList boolTable (Node (Op op) a b) = zipWith (eval op) (evalTree varList boolTable a) (evalTree varList boolTable b)
 
 genBoolTable = go []
@@ -59,14 +60,6 @@ eval '|' = (.|.)
 eval '^' = xor
 eval '>' = materialCondition where materialCondition a b = complement a .|. b
 eval '=' = (==)
-
--- test variables
-
-t = parseTree "AB&C|"
-
-v = evalVariableTable t
-
-b = genBoolTable $ length v
 
 -- utility functions
 
