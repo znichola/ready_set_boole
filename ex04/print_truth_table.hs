@@ -4,7 +4,17 @@ data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
 
 data Packet a b = Op a | Value b deriving (Show)
 
-print_truth_table s = print $ "foobar" <> s
+print_truth_table input =
+  do
+    putStrLn $ showLine vars <> " = |"
+    putStrLn $ showSeperator (length vars + 1)
+    putStr $ showSquare res
+  where
+    tree = parseTree input
+    vars = evalVariableTable tree
+    bol = genBoolTable $ length vars
+    resCol = evalTree vars bol tree
+    res = mergeCol bol resCol
 
 -- parsing the tree
 
@@ -25,6 +35,10 @@ parseOp c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
 
+evalTree _ _ Empty = error "Cannot evaluate empty node"
+evalTree varList boolTable (Node (Value val) _ _) = getValBoolTable val varList boolTable
+evalTree varList boolTable (Node (Op op) a b) = zipWith (eval op) (evalTree varList boolTable a) (evalTree varList boolTable b)
+
 genBoolTable = go []
   where
     go l n | n <= 0 = l
@@ -39,10 +53,6 @@ evalVariableTable = removeDuplicates . go []
     go x (Node (Value v) _ _) = x <> [v]
     go x (Node (Op _) a b) = x <> go [] a <> go [] b
 
--- evalTree Empty = error "cannot evaluate empty node"
--- evalTree (Node (Value value) _ _) = value
--- evalTree (Node (Op op) a b) = eval op (evalTree a) (evalTree b)
-
 eval '!' = opposit where opposit a _ = complement a
 eval '&' = (.&.)
 eval '|' = (.|.)
@@ -52,8 +62,10 @@ eval '=' = (==)
 
 -- test variables
 
-t = parseTree "AB&"
+t = parseTree "AB&C|"
+
 v = evalVariableTable t
+
 b = genBoolTable $ length v
 
 -- utility functions
@@ -62,10 +74,12 @@ getValBoolTable val hdr = getCol (findVal val hdr)
 
 getCol n = map (!! n)
 
+mergeCol = zipWith (\a b -> a <> [b])
+
 findVal val = go 0
   where
     go acc [] = error ("Value " <> show val <> " not in list")
-    go acc (x:xs)
+    go acc (x : xs)
       | x == val = acc
       | otherwise = go (acc + 1) xs
 
