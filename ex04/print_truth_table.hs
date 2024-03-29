@@ -46,7 +46,6 @@ genBoolTable = go []
     go [] n = go [[False], [True]] (n - 1)
     go l n = go [x <> y | x <- l, y <- [[False], [True]]] (n - 1)
 
-evalVariableTable :: Tree (Packet a Char) -> [Char]
 evalVariableTable = removeDuplicates . go []
   where
     removeDuplicates a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
