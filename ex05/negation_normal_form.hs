@@ -1,6 +1,6 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
-data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show)
+data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
 print_truth_table input =
   do
@@ -13,6 +13,39 @@ print_truth_table input =
     bol = genBoolTable $ length vars
     resCol = evalTree vars bol tree
     res = mergeCol bol resCol
+
+-- testing values
+
+t = parseTree "AB>"
+
+v = evalVars t
+
+b = genBoolTable $ length v
+
+-- rewriting the tree
+
+rewriteTree (Nullary term) = Nullary term
+rewriteTree (Unary op a) =
+  case (op, a) of
+    -- Elimination of double negation
+    ('!', Unary '!' a) -> rewriteTree a
+    -- De Morgan’s laws: or
+    ('!', Binary '|' a b) -> rewriteTree (Binary '&' (Unary '!' a) (Unary '!' b))
+    -- De Morgan’s laws: and
+    ('!', Binary '&' a b) -> rewriteTree (Binary '|' (Unary '!' a) (Unary '!' b))
+    _ -> Unary op (rewriteTree a)
+rewriteTree (Binary op a b) =
+  case (op, a, b) of
+    -- Material conditions
+    ('>', a, b) -> rewriteTree (Binary '|' (Unary '!' a) b)
+    -- Equivalence
+    ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
+    -- Distributivity: and
+    ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
+    -- Distributivity: or
+    -- ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
+    -- enabeling both of these causes an infinate loop where more and more ops get added
+    _ -> Binary op (rewriteTree a) (rewriteTree b)
 
 -- parsing the tree
 
@@ -35,7 +68,6 @@ evalTree vars bools (Nullary term) = getValBoolTable term vars bools
 evalTree vars bools (Unary '!' left) = map complement (evalTree vars bools left)
 evalTree vars bools (Binary op left right) = zipWith (eval op) (evalTree vars bools left) (evalTree vars bools right)
 
-evalVars :: (Eq a) => Tree a -> [a]
 evalVars = removeDuplicates . go []
   where
     removeDuplicates a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
@@ -75,7 +107,7 @@ showTreeRPN = go
     go (Unary op left) = go left <> [op]
     go (Binary op left right) = go right <> go left <> [op]
 
-showTree tree = init $ tail $ go tree
+showTree tree = (\x -> if length x >= 3 then init $ tail x else x) $ go tree
   where
     go (Nullary v) = showStrip v
     go (Unary op left) = "(" <> showStrip op <> go left <> ")"
