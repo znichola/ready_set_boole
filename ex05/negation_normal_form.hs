@@ -68,6 +68,12 @@ parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
 
+evalRNP = evalTreeSimple . parseTree
+
+evalTreeSimple input = evalTree vars (genBoolTable $ length vars) input
+  where
+    vars = evalVars input
+
 evalTree vars bools (Nullary term) = getValBoolTable term vars bools
 evalTree vars bools (Unary '!' left) = map complement (evalTree vars bools left)
 evalTree vars bools (Binary op left right) = zipWith (eval op) (evalTree vars bools left) (evalTree vars bools right)
@@ -132,3 +138,33 @@ putSquare header =
     putStrLn $ showLine header <> " = |"
     putStrLn $ showSeperator (length header + 1)
     putStr $ showSquare $ genBoolTable (length header)
+
+-- unit testing
+
+nnfInput = ["AB&!", "AB|!", "AB>", "AB=", "AB|C&!"]
+
+nnfOutput = ["A!B!|", "A!B!&", "A!B|", "AB&A!B!&|", "A!B!&C!|"]
+
+ttInput = ["AB&C|", "AB&", "AB|", "AB|C&", "ABC|&"]
+
+ttOutput = ["(A&B)|C", "A&B", "A|B", "(A|B)&C", "A&(B|C)"]
+
+creazyTrees = ["A!!B!CD|^!!&A>E!=", "AB>A>E>C>D="]
+
+allRPNs = nnfInput <> nnfOutput <> ttInput <> creazyTrees
+
+checkShowRPN = map (\x -> x == showTreeRPN (parseTree x)) allRPNs
+
+checkNNFtree = zipWith (\x y -> rewriteTree (parseTree x) == parseTree y) nnfInput nnfOutput
+
+checkNNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == evalTreeSimple (parseTree y)) nnfInput nnfOutput
+
+checkNNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) nnfInput nnfOutput
+
+runTests = do
+  putStrLn $ "testing RPN print from parsed AST   : " <> pass checkShowRPN
+  putStrLn $ "testing binary result after rewrite : " <> pass checkNNFtree
+  putStrLn $ "testing bools result after rewrite  : " <> pass checkNNFbools
+  putStrLn $ "testing string result after rewrite : " <> pass checkNNFstring
+  where
+    pass v = if and v then "Pass" else "Fail"
