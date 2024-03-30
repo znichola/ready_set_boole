@@ -43,11 +43,17 @@ rewriteTree (Binary op a b) =
     -- Material conditions
     ('>', a, b) -> rewriteTree (Binary '|' (Unary '!' a) b)
     -- Equivalence
-    ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
+    -- ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
+    -- Equivalence' to match example and remove unwanted > operations (A&B)|((!A)&(!B))
+    ('=', a, b) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b)))
     -- Distributivity: and
     -- ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
     -- Distributivity: or
     -- ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
+    -- Distributivity: and'
+    -- ('|', Binary '&' a b, Binary '&' a' c) | a == a' -> rewriteTree (Binary '&' a (Binary '|' b c))
+    -- Distributivity: or'
+    -- ('&', Binary '|' a b, Binary '|' a' c) | a == a' -> rewriteTree (Binary '|' a (Binary '&' b c))
     -- enabeling both of these causes an infinate loop where more and more ops get added
     _ -> Binary op (rewriteTree a) (rewriteTree b)
 
@@ -68,7 +74,7 @@ parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
 
-evalRNP = evalTreeSimple . parseTree
+evalRPN = evalTreeSimple . parseTree
 
 evalTreeSimple input = evalTree vars (genBoolTable $ length vars) input
   where
