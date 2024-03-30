@@ -2,6 +2,10 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
+negation_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
+
+doNothing = putStrLn . showTreeRPN . parseTree
+
 print_truth_table input =
   do
     putStrLn $ showLine vars <> " = |"
@@ -41,7 +45,7 @@ rewriteTree (Binary op a b) =
     -- Equivalence
     ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
     -- Distributivity: and
-    ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
+    -- ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
     -- Distributivity: or
     -- ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
     -- enabeling both of these causes an infinate loop where more and more ops get added
@@ -105,7 +109,7 @@ showTreeRPN = go
   where
     go (Nullary term) = [term]
     go (Unary op left) = go left <> [op]
-    go (Binary op left right) = go right <> go left <> [op]
+    go (Binary op left right) = go left <> go right <> [op]
 
 showTree tree = (\x -> if length x >= 3 then init $ tail x else x) $ go tree
   where
