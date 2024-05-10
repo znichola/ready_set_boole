@@ -171,10 +171,20 @@ checkNNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == e
 
 checkNNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) nnfInput nnfOutput
 
+checkCNFtree = zipWith (\x y -> rewriteTree (parseTree x) == parseTree y) cnfInput cnfOutput
+
+checkCNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == evalTreeSimple (parseTree y)) cnfInput cnfOutput
+
+checkCNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) cnfInput cnfOutput
+
+
 runTests = do
   putStrLn $ "testing RPN print from parsed AST   : " <> pass checkShowRPN
-  putStrLn $ "testing binary result after rewrite : " <> pass checkNNFtree
-  putStrLn $ "testing bools result after rewrite  : " <> pass checkNNFbools
-  putStrLn $ "testing string result after rewrite : " <> pass checkNNFstring
+  -- putStrLn $ "NNF testing binary result after rewrite : " <> pass checkNNFtree
+  putStrLn $ "NNF testing bools result after rewrite  : " <> pass checkNNFbools
+  -- putStrLn $ "NNF testing string result after rewrite : " <> pass checkNNFstring
+  putStrLn $ "CNF testing binary result after rewrite : " <> pass checkCNFtree
+  putStrLn $ "CNF testing bools result after rewrite  : " <> pass checkCNFbools
+  putStrLn $ "CNF testing string result after rewrite : " <> pass checkCNFstring
   where
     pass v = if and v then "Pass" else "Fail"
