@@ -1,0 +1,11 @@
+
+-- rewrite in unison, for the easy install, integrated testing and simpler code browsing
+
+ex00.adder : Nat -> Nat -> Nat
+ex00.adder a b = match b with
+	0 -> a
+	_ -> adder (xor a b) (shiftLeft (and a b) 1)
+
+test> ex00.adder.test.ex1 = check ((adder 2 2) == (2 + 2))
+test> ex00.adder.test.ex2 = check ((adder 400 20) == (400 + 20))
+
