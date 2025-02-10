@@ -1,0 +1,12 @@
+ex02.gray_code : Nat -> Nat
+ex02.gray_code num = xor num (shiftRight num 1)
+
+test> ex02.gray_code.text.ex1 = check (gray_code 0 == 0)
+test> ex02.gray_code.text.ex2 = check (gray_code 1 == 1)
+test> ex02.gray_code.text.ex3 = check (gray_code 2 == 3)
+test> ex02.gray_code.text.ex4 = check (gray_code 3 == 2)
+test> ex02.gray_code.text.ex5 = check (gray_code 4 == 6)
+test> ex02.gray_code.text.ex6 = check (gray_code 5 == 7)
+test> ex02.gray_code.text.ex7 = check (gray_code 7 == 4)
+test> ex02.gray_code.text.ex8 = check (gray_code 8 == 12)
+
