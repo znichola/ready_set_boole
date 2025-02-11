@@ -1,9 +1,15 @@
-
 -- types
 
 ex04.Tree.doc : Doc 
 ex04.Tree.doc = {{
   The tree which reprisents the binary computation.
+
+  A sample replisentation: 
+
+  ```
+  show <| parse (tokenize <| toCharList "AB&C|")
+  ``` 
+
 }}
 
 structural type ex04.Tree
@@ -59,9 +65,20 @@ test> ex04.parse.tests.ex1 =
       (ex04.parse (tokenize <| toCharList "AB&"))
       (Tree.Node
           (Op ?&)
-          (Tree.Node (Val ?B) Tree.Empty Tree.Empty)
-          (Tree.Node (Val ?A) Tree.Empty Tree.Empty))
-
+          (Tree.Node (Val ?A) Tree.Empty Tree.Empty)
+          (Tree.Node (Val ?B) Tree.Empty Tree.Empty))
+test> ex04.parse.tests.ex2 = 
+  test.verify do
+    c text = tokenize <| toCharList text
+    use ex04 parse
+    ensureEqual
+      (show <| parse (c "AB&")) "(A&B)"
+    ensureEqual
+      (show <| parse (c "AB|")) "(A|B)"
+    ensureEqual
+      (show <| parse (c "AB|C&")) "((A|B)&C)"
+    ensureEqual
+      (show <| parse (c "ABC|&")) "(A&(B|C))"
 
 ex04.parse_token : ex04.Packet -> [ex04.Tree] -> [ex04.Tree]
 ex04.parse_token = cases
@@ -73,7 +90,7 @@ ex04.parse_token = cases
     ex04.Tree.Node (ex04.Packet.Op ?!) x ex04.Tree.Empty List.+: xs
   _, [_] -> bug "Need at least two values for Op"
   ex04.Packet.Op o, [x, y] ++ xys ->
-    ex04.Tree.Node (ex04.Packet.Op o) x y List.+: xys
+    ex04.Tree.Node (ex04.Packet.Op o) y x List.+: xys -- invert x y because it's how rpn works
 
 -- tokenising / lexer
 
@@ -104,11 +121,22 @@ ex04.token = cases
 
 -- printing / display 
 
+ex04.show : ex04.Tree -> Text
+ex04.show = cases
+  ex04.Tree.Empty                   -> ""
+  ex04.Tree.Node (Val v) left right -> (toText v)
+  ex04.Tree.Node (Op o) left right  -> "(" ++ (show left) ++ (toText o) ++ (show right) ++ ")"
+
+> toCharList "AB&C|" |> ex04.tokenize |> ex04.parse |> ex04.show
+
 ex04.show_RNP : ex04.Tree -> Text
 ex04.show_RNP tree =
   go : ex04.Tree -> [Char]
   go t = [?F, ?O]
+
   go tree |> fromCharList
 
 > toCharList "AB&" |> ex04.tokenize |> ex04.parse |> ex04.show_RNP
+
+
 
