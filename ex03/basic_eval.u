@@ -1,0 +1,39 @@
+
+ex03.eval_formula : Text -> [Boolean]
+ex03.eval_formula instructions = let
+
+    go : [Boolean] -> [Char] -> [Boolean]
+    go stack inst = match (stack, inst) with
+        (stack, []) -> stack
+        (stack, x +: xs) -> go (do_op x stack) xs
+
+    do_op : Char -> [Boolean] -> [Boolean]
+    do_op op stack = match (op, stack) with
+        (?1, s)       -> true +: stack
+        (?0, s)       -> false +: stack
+        (_, [])       -> bug "No value to do op with"
+        (?!, x +: xs) -> (not x) +: xs
+        (_, [_])      -> bug "Not enough values to op with"
+        (?&, [a, b] ++ xxs) -> and a b +: xxs
+        (?|, [a, b] ++ xxs) -> or  a b +: xxs
+        (?^, [a, b] ++ xxs) -> xor a b +: xxs
+        (?>, [a, b] ++ xxs) -> or (not a) b +: xxs
+        (?=, [a, b] ++ xxs) -> a == b +: xxs
+        _ -> bug "Unknown operator"
+
+    toCharList instructions |> go []
+
+
+ex03.eval_formula.test.checker : Boolean -> [Boolean] -> [Result]
+ex03.eval_formula.test.checker expected result = match result with
+    [res] -> check (res == expected)
+    _ -> check false
+
+test> ex03.eval_formula.test.ex1 = checker false (eval_formula "10&")
+test> ex03.eval_formula.test.ex2 = checker true (eval_formula "11&")
+test> ex03.eval_formula.test.ex3 = checker true (eval_formula "10|")
+test> ex03.eval_formula.test.ex4 = checker true (eval_formula "11>")
+test> ex03.eval_formula.test.ex5 = checker false (eval_formula "10=")
+test> ex03.eval_formula.test.ex6 = checker true (eval_formula "1011||=")
+
+

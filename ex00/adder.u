@@ -1,26 +1,4 @@
 
-README : Doc
-README = {{
-# Ready set boole"
-
-An introduction to Boolean Algebra.
-
-## Setup
-
-Install [unison](https://www.unison-lang.org/docs/install-instructions/), it's just a small binary.
-
-## Usage
-
-"projects" to list all projects "switch" to select one.
-
-}}
----
-
-ex01.multiplier : Nat -> Nat -> Nat
-ex01.multiplier a b = 
-
--- rewrite in unison, for the easy install, integrated testing and simpler code browsing
-
 ex00.adder : Nat -> Nat -> Nat
 ex00.adder a b = match b with
 	0 -> a
