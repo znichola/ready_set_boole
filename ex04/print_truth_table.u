@@ -7,7 +7,7 @@ ex04.Tree.doc = {{
   A sample replisentation: 
 
   ```
-  show <| parse (tokenize <| toCharList "AB&C|")
+  show <| parse (tokenize <| toCharList "A!B&C|")
   ``` 
 
 }}
@@ -18,8 +18,15 @@ structural type ex04.Tree
 
 ex04.Packet.doc : Doc
 ex04.Packet.doc = {{
-  The object for the Nodes of the {type Tree}.
+  The object for the Nodes of the {type Tree}, also used as the "tokens".
+
+  ```
+  tokenize <| toCharList "AB&CB<|"
+  ```
+
 }}
+
+> show <| parse (tokenize <| toCharList "AB&C>B|!")
 
 structural type ex04.Packet
   = Val Char
@@ -74,20 +81,23 @@ test> ex04.parse.tests.ex2 =
     ensureEqual
       (show <| parse (c "AB&")) "(A&B)"
     ensureEqual
+      (show <| parse (c "A!")) "!A"
+    ensureEqual
       (show <| parse (c "AB|")) "(A|B)"
     ensureEqual
       (show <| parse (c "AB|C&")) "((A|B)&C)"
     ensureEqual
       (show <| parse (c "ABC|&")) "(A&(B|C))"
+    ensureEqual
+      (show <| parse (c "AB|C&!")) "!((A|B)&C)"
 
 ex04.parse_token : ex04.Packet -> [ex04.Tree] -> [ex04.Tree]
 ex04.parse_token = cases
   ex04.Packet.Val v, s ->
-    ex04.Tree.Node (ex04.Packet.Val v) ex04.Tree.Empty ex04.Tree.Empty
-      List.+: s
+    ex04.Tree.Node (ex04.Packet.Val v) ex04.Tree.Empty ex04.Tree.Empty +: s
   _, [] -> bug "No value to op with"
   ex04.Packet.Op ?!, x +: xs ->
-    ex04.Tree.Node (ex04.Packet.Op ?!) x ex04.Tree.Empty List.+: xs
+    ex04.Tree.Node (ex04.Packet.Op ?!) x ex04.Tree.Empty +: xs
   _, [_] -> bug "Need at least two values for Op"
   ex04.Packet.Op o, [x, y] ++ xys ->
     ex04.Tree.Node (ex04.Packet.Op o) y x List.+: xys -- invert x y because it's how rpn works
@@ -116,8 +126,8 @@ ex04.token : Char -> ex04.Packet
 ex04.token = cases
   c 
     | Char.inRange ?A ?Z c                 -> ex04.Packet.Val c
-    | List.contains c [?&, ?|, ?^, ?=, ?>] -> ex04.Packet.Op c
-  _ -> bug "Character not recognised"
+    | List.contains c [?&, ?|, ?^, ?=, ?>, ?!] -> ex04.Packet.Op c
+  c -> bug ((toText c) ++  " character not recognised")
 
 -- printing / display 
 
@@ -125,6 +135,7 @@ ex04.show : ex04.Tree -> Text
 ex04.show = cases
   ex04.Tree.Empty                   -> ""
   ex04.Tree.Node (Val v) left right -> (toText v)
+  ex04.Tree.Node (Op ?!) left _    -> "!" ++ (show left)
   ex04.Tree.Node (Op o) left right  -> "(" ++ (show left) ++ (toText o) ++ (show right) ++ ")"
 
 > toCharList "AB&C|" |> ex04.tokenize |> ex04.parse |> ex04.show
