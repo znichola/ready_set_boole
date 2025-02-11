@@ -1,14 +1,28 @@
-structural type ex04.Packet
-  = Val Char
-  | Op Char
+
+-- types
+
+ex04.Tree.doc : Doc 
+ex04.Tree.doc = {{
+  The tree which reprisents the binary computation.
+}}
 
 structural type ex04.Tree
   = Empty
   | Node ex04.Packet ex04.Tree ex04.Tree
 
+ex04.Packet.doc : Doc
+ex04.Packet.doc = {{
+  The object for the Nodes of the {type Tree}.
+}}
+
+structural type ex04.Packet
+  = Val Char
+  | Op Char
+
+-- final printing function
+
 ex04.print_truth_table : Text ->{IO} ()
 ex04.print_truth_table expression = todo "implement the funciton"
-
 
 -- parsing
 
@@ -20,7 +34,7 @@ ex04.parse.doc = {{
   For example:
 
   ```
-ex04.parse (ex04.tokenize <| toCharList "AB&")
+  ex04.parse (ex04.tokenize <| toCharList "AB&")
 
   ```
  }}
@@ -62,6 +76,13 @@ ex04.parse_token = cases
     ex04.Tree.Node (ex04.Packet.Op o) x y List.+: xys
 
 -- tokenising / lexer
+
+ex04.tokenize.doc : Doc
+ex04.tokenize.doc = {{
+  Transforms a list of {type Char} to to list of {type Packet} the bulding 
+  block for the {type Tree}.
+}}
+
 
 ex04.tokenize : [Char] -> [ex04.Packet]
 ex04.tokenize = cases
