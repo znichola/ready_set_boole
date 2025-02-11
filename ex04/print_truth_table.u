@@ -1,62 +1,93 @@
-
 structural type ex04.Packet
   = Val Char
   | Op Char
 
 structural type ex04.Tree
   = Empty
-  | Node Packet ex04.Tree ex04.Tree
-
+  | Node ex04.Packet ex04.Tree ex04.Tree
 
 ex04.print_truth_table : Text ->{IO} ()
 ex04.print_truth_table expression = todo "implement the funciton"
-
--- evaulation
-
 
 
 -- parsing
 
 ex04.parse.doc : Doc
-ex04.parse.doc =
-  {{
-  It's a funciton that takes a list of characters and a "stack" as the
-  characters are parsed in RPN the trees that are made are added to the stack,
-  at the end of the recursive process, there should be no left over trees in
-  the input stack and the output stack should have just one tree.
-  }}
+ex04.parse.doc = {{
+  Parsing happens after tokenization & lexing it will transform
+  the list of tokens into a tree reprisentatino of the computaion.
 
-ex04.parse : [Tree] -> [Packet] -> [Tree]
-ex04.parse = cases
-  [s], []    -> [s]
-  _, []      -> bug "stack should only contain one tree at the end"
-  s, i +: ix -> ex04.parse (parse_token i s) ix
+  For example:
 
-ex04.parse_token : Packet -> [Tree] -> [Tree]
+  ```
+ex04.parse (ex04.tokenize <| toCharList "AB&")
+
+  ```
+ }}
+
+ex04.parse : [ex04.Packet] -> ex04.Tree
+ex04.parse instructions =
+  use ex04 Tree Packet parse_token
+  go : [Tree] -> [Packet] -> [Tree]
+  go = cases
+    [s], []    -> [s]
+    _, []      -> bug "Stack should only contain one tree at the end"
+    s, i +: ix -> go (parse_token i s) ix
+  match List.head (go [] instructions) with
+    None   -> bug "Again list can't be empty"
+    Some t -> t
+
+> ex04.parse (ex04.tokenize <| toCharList "AB&")
+
+test> ex04.parse.tests.ex1 = 
+  test.verify do
+    ensureEqual
+      (ex04.parse (tokenize <| toCharList "AB&"))
+      (Tree.Node
+          (Op ?&)
+          (Tree.Node (Val ?B) Tree.Empty Tree.Empty)
+          (Tree.Node (Val ?A) Tree.Empty Tree.Empty))
+
+
+ex04.parse_token : ex04.Packet -> [ex04.Tree] -> [ex04.Tree]
 ex04.parse_token = cases
-  Val v, s            -> Tree.Node (Val v) Tree.Empty Tree.Empty List.+: s
-  _, []               -> bug "No value to op with"
-  Op ?!, x +: xs      -> Tree.Node (Op ?!) x Tree.Empty List.+: xs
-  _, [_]              -> bug "Need at least two values of Op"
-  Op o, [x, y] ++ xys -> Tree.Node (Op o) x y List.+: xys
+  ex04.Packet.Val v, s ->
+    ex04.Tree.Node (ex04.Packet.Val v) ex04.Tree.Empty ex04.Tree.Empty
+      List.+: s
+  _, [] -> bug "No value to op with"
+  ex04.Packet.Op ?!, x +: xs ->
+    ex04.Tree.Node (ex04.Packet.Op ?!) x ex04.Tree.Empty List.+: xs
+  _, [_] -> bug "Need at least two values for Op"
+  ex04.Packet.Op o, [x, y] ++ xys ->
+    ex04.Tree.Node (ex04.Packet.Op o) x y List.+: xys
 
--- tokeizeing / lexing
+-- tokenising / lexer
 
-ex04.tokenize : [Char] -> [Packet]
+ex04.tokenize : [Char] -> [ex04.Packet]
 ex04.tokenize = cases
   []      -> []
-  x +: xs -> token x List.+: ex04.tokenize xs
+  x +: xs -> ex04.token x List.+: ex04.tokenize xs
 
 test> ex04.tokenize.tests.ex1 = 
   test.verify do
-    ensureEqual (tokenize <| toCharList "AB&") [Val ?A, Val ?B, Op ?&]
+    ensureEqual
+      (ex04.tokenize <| toCharList "AB&")
+      [ex04.Packet.Val ?A, ex04.Packet.Val ?B, ex04.Packet.Op ?&]
 
-ex04.token : Char -> Packet
+ex04.token : Char -> ex04.Packet
 ex04.token = cases
   c 
-    | Char.inRange ?A ?Z c                 -> Val c
-    | List.contains c [?&, ?|, ?^, ?=, ?>] -> Op c
+    | Char.inRange ?A ?Z c                 -> ex04.Packet.Val c
+    | List.contains c [?&, ?|, ?^, ?=, ?>] -> ex04.Packet.Op c
   _ -> bug "Character not recognised"
 
+-- printing / display 
 
--- printing
+ex04.show_RNP : ex04.Tree -> Text
+ex04.show_RNP tree =
+  go : ex04.Tree -> [Char]
+  go t = [?F, ?O]
+  go tree |> fromCharList
+
+> toCharList "AB&" |> ex04.tokenize |> ex04.parse |> ex04.show_RNP
+
