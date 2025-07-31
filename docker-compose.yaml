@@ -1,8 +1,9 @@
 services:
   dev:
     container_name: read_set_boole
-    image: haskell:9
-    working_dir: /app
+    build: .
     volumes:
       - .:/app
-    command: sh -c "tail -F notfound"
+    ports:
+      - "2222:22"
+    command: /usr/sbin/sshd -D
