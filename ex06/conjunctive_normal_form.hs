@@ -1,4 +1,8 @@
+-- {-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}
+-- bandade fix, should do it properly at some point, it's to do with partials, the head function can throw on empty list. should not be possible but the warning is annoying
+
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
+import Data.List.NonEmpty (NonEmpty(..))
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
@@ -59,7 +63,11 @@ rewriteTree (Binary op a b) =
 
 -- parsing the tree
 
-parseTree = head . go []
+head' []  = error "stack must contain at least one elment"
+head' [t] = t
+head' t   = error "should only contain one tree in the end"
+
+parseTree = head' . go []
   where
     go [t] [] = [t]
     go _ [] = error "stack should only contain one element at the end"

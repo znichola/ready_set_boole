@@ -30,7 +30,7 @@ b = genBoolTable $ length v
 
 -- rewriteTree2 (Nullary _) = Nullary ' '
 -- rewriteTree2 (Unary _) = Unary '|'
-rewriteTree2 t =
+-- rewriteTree2 t =
 rewriteTree2 = eliminationOfDoubleNegative
     . deMorgansLawAnd
     . deMorgansLawOr
