@@ -1,6 +1,3 @@
--- {-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}
--- bandade fix, should do it properly at some point, it's to do with partials, the head function can throw on empty list. should not be possible but the warning is annoying
-
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 import Data.List.NonEmpty (NonEmpty(..))
 
