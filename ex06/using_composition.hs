@@ -19,12 +19,16 @@ ruleSet =
     ,deMorgansLawOr
     ,materialCondition
     ,equivilence
-    ,distributivityAnd
+    ,removeXor
+    ,distributivityAnd'
+    ,distributivityOr'
+    ,moveAndLeft
+    ,moveOrLeft
     ]
 
-rewriteTree = rewriteTreeBottomUp ruleSet
+rewriteTree = rewriteTreeTopDown ruleSet
 
-rewriteTree2 = rewriteTreeTopDown ruleSet
+rewriteTree2 = rewriteTreeBottomUp ruleSet
 
 rewriteTreeBottomUp :: [Rule] -> Tree Char -> Tree Char
 rewriteTreeBottomUp _ (Nullary op) = Nullary op
@@ -39,16 +43,6 @@ rewriteTreeBottomUp rules (Binary op l r) =
    in case applyRules rules (Binary op l' r') of
         Just res -> rewriteTreeBottomUp rules res
         Nothing -> Binary op l' r'
-
--- rewriteTreeBottomUp _ tree = tree
-
--- rewriteTreeBottomUp :: [Rule] -> Tree Char -> Tree Char
--- rewriteTreeBottomUp rules tree =
---   let rewrite = rewriteTreeBottomUp rules
---     in case tree of
---       (Nullary t) -> Nullary t
---       (Unary op t) -> Unary op (rewrite t)
---       (Binary op l r) -> Binary op (rewrite l) (rewrite r)
 
 rewriteTreeTopDown :: [Rule] -> Tree Char -> Tree Char
 rewriteTreeTopDown rules tree =
@@ -69,18 +63,6 @@ applyRules (rule : xs) tree =
     Just t' -> Just t'
     Nothing -> applyRules xs tree
 
--- rewriteTree2 :: [Rule] -> Tree Char -> Tree Char
--- rewriteTree2 [] tree = tree
--- rewriteTree2 _ (Nullary t) = Nullary t
--- rewriteTree2 rules tree = rewriteTree2 rules $ applyRules rules tree
-
--- applyRules :: [Rule] -> Tree Char -> Tree Char
--- applyRules [] tree = tree
--- applyRules (rule:xs) tree =
---   case rule tree of
---     Just t' -> t'
---     Nothing -> applyRules xs tree
-
 -- rewrite rules
 
 eliminationOfDoubleNegative (Unary '!' (Unary '!' a)) = Just a
@@ -95,49 +77,50 @@ deMorgansLawOr _ = Nothing
 materialCondition (Binary '>' a b) = Just $ Binary '|' (Unary '!' a) b
 materialCondition _ = Nothing
 
--- Equivalence' to match example and remove unwanted '>' operations (A&B)|((!A)&(!B))
 -- equivilence' (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
 -- equivilence' _ = Nothing
+
+-- ( (!A|B) & !A) | ( (!A|B) & B)
+
+-- ( (!A|B) & !A) | ( (!A|B) & B)
+
+-- Simplify final expression to match example and remove unwanted '>' operations (A&B)|((!A)&(!B))
+equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
+equivilenceSimplified _ = Nothing
 
 equivilence (Binary '=' a b) = Just $ Binary '&' (Binary '>' a b) (Binary '>' a b)
 equivilence _ = Nothing
 
+-- ( (A|B) & !A ) | ( (A|B) & !B )
+-- (A|B) & (!A | !B)
+
+-- A XOR B = (A OR B) AND (NOT A | NOT B)
+
+removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
+-- removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Unary '!' (Binary '&' a b ))
+removeXor _ = Nothing
+
 distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
 distributivityAnd _ = Nothing
+
+-- the inverse is usefull for simplifying the expression!
+distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' c)) | a == a' = Just $ Binary '&' a (Binary '|' b c)
+distributivityAnd' _ = Nothing
 
 distributivityOr (Binary '|' a (Binary '&' b c)) = Just $ Binary '&' (Binary '|' a b) (Binary '|' a c)
 distributivityOr _ = Nothing
 
--- #######################
+distributivityOr' (Binary '&' (Binary '|' a b) (Binary '|' a' c)) | a == a' = Just $ Binary '|' a (Binary '&' b c)
+distributivityOr' _ = Nothing
 
--- rewriteTree (Nullary term) = Nullary term
--- rewriteTree (Unary op a) =
---   case (op, a) of
---     -- Elimination of double negation
---     ('!', Unary '!' a) -> rewriteTree a
---     -- De Morgan’s laws: or
---     ('!', Binary '|' a b) -> rewriteTree (Binary '&' (Unary '!' a) (Unary '!' b))
---     -- De Morgan’s laws: and
---     ('!', Binary '&' a b) -> rewriteTree (Binary '|' (Unary '!' a) (Unary '!' b))
---     _ -> Unary op (rewriteTree a)
--- rewriteTree (Binary op a b) =
---   case (op, a, b) of
---     -- Material conditions
---     ('>', a, b) -> rewriteTree (Binary '|' (Unary '!' a) b)
---     -- Equivalence
---     -- ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
---     -- Equivalence' to match example and remove unwanted > operations (A&B)|((!A)&(!B))
---     ('=', a, b) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b)))
---     -- Distributivity: and
---     -- ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
---     -- Distributivity: and'
---     ('|', Binary '&' a b, Binary '&' a' c) | a == a' -> rewriteTree (Binary '&' a (Binary '|' b c))
---     -- Distributivity: or
---     ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
---     -- Distributivity: or'
---     -- ('&', Binary '|' a b, Binary '|' a' c) | a == a' -> rewriteTree (Binary '|' a (Binary '&' b c))
---     -- enabeling both of these causes an infinate loop where more and more ops get added
---     _ -> Binary op (rewriteTree a) (rewriteTree b)
+moveAndLeft (Binary '&' (Binary '&' (Nullary a) (Nullary b)) (Nullary c)) = Just $ Binary '&' (Nullary a) (Binary '&' (Nullary b) (Nullary c))
+moveAndLeft _ = Nothing
+
+moveOrLeft (Binary '|' (Binary '|' (Nullary a) (Nullary b)) (Nullary c)) = Just $ Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))
+moveOrLeft _ = Nothing
+
+moveOrLeft2 (Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))) =  Just $ Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))
+moveOrLeft2 _ = Nothing
 
 -- parsing the tree
 
@@ -151,7 +134,7 @@ parseTerm term stack | term `elem` ['A' .. 'Z'] = Nullary term : stack
 parseTerm term [] = error ("no value to do op \'" ++ [term] ++ "\'")
 parseTerm '!' (x : stack) = Unary '!' x : stack
 parseTerm term [_] = error ("not enough values to do op \'" ++ [term] ++ "\'")
-parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack
+parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack -- reverse order to postfix, aka RPN notation
 parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
