@@ -2,6 +2,7 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 import Control.Monad (when)
 import Data.Function ((&))
 import Data.ByteString (group)
+import Debug.Trace
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
@@ -22,7 +23,7 @@ ruleSet =
     ,distributivityOr
     ]
 
-rewriteTree = rewriteTreeTopDown ruleSet
+rewriteTree = rebalanceTree . rewriteTreeTopDown ruleSet
 
 rewriteTree2 = rewriteTreeBottomUp ruleSet
 
@@ -61,26 +62,23 @@ applyRules (rule : xs) tree =
 
 -- rewrite rules
 
-leftLean :: Tree Char -> Tree Char
-leftLean tree = let
+rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
+
+leftLeanOp :: Char -> Tree Char -> Tree Char
+leftLeanOp op tree = let
   flattened = splat [] tree
   reBalanced = shiftLeft $ reverse flattened
   in
     head reBalanced
     where
-    splat xs (Binary '|' a b) = splat [] a <> splat [] b <> xs
-    splat xs tree = tree : xs
+    splat xs (Binary op' a b) |
+      op' == op = splat [] a <> splat [] b <> xs
+    splat xs tree = tree : xs -- here is where you would think this needs to be recursive,
+                              --  but no, it's fine, all other symbols are factored out at this point
 
     shiftLeft [] = error "Cannot left lean an empty list"
     shiftLeft [one] = [one]
-    shiftLeft (x:y:ss) = shiftLeft $ Binary '|' y x : ss
-
--- testing values
-
-a = parseTree "AB|C|D|"
-
-b = leftLean a
-
+    shiftLeft (x:y:ss) = shiftLeft $ Binary op y x : ss
 
 eliminationOfDoubleNegative (Unary '!' (Unary '!' a)) = Just a
 eliminationOfDoubleNegative _ = Nothing
@@ -96,10 +94,6 @@ materialCondition _ = Nothing
 
 -- equivilence' (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
 -- equivilence' _ = Nothing
-
--- ( (!A|B) & !A) | ( (!A|B) & B)
-
--- ( (!A|B) & !A) | ( (!A|B) & B)
 
 -- Simplify final expression to match example and remove unwanted '>' operations (A&B)|((!A)&(!B))
 equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
@@ -199,25 +193,11 @@ showTree tree = (\x -> if length x >= 3 then init $ tail x else x) $ go tree
 
 showStrip s = [x | x <- show s, x `notElem` "\'\""]
 
-showSquare = foldr (\x -> (<>) (showLine (convertBool x) <> "\n")) []
-
-convertBool x = [(if y then '1' else '0') | y <- x]
-
-showLine arr = "|" <> foldr (\x -> (<>) (" " <> [x] <> " |")) "" arr
-
-showSeperator n = "|" <> concat (replicate n "---|")
-
-putSquare header =
-  do
-    putStrLn $ showLine header <> " = |"
-    putStrLn $ showSeperator (length header + 1)
-    putStr $ showSquare $ genBoolTable (length header)
-
 -- unit testing
 
-cnfInput = ["AB&!", "AB|!", "AB|C&", "AB|C|D|", "AB&C&D&", "AB&!C!|", "AB|!C!&"]
+cnfInput = ["AB&!", "AB|!", "AB|C&", "AB|C|D|", "AB&C&D&", "AB&!C!|", "AB|!C!&", "ABCD&|&"]
 
-realOutput = ["A!B!|", "A!B!&", "AB|C&", "AB|C|D|", "AB&C&D&", "A!B!|C!|", "A!B!&C!&"]
+realOutput = ["A!B!|", "A!B!&", "AB|C&", "AB|C|D|", "AB&C&D&", "A!B!|C!|", "A!B!&C!&", "ABC|BD|&&"]
 
 cnfOutput = ["A!B!|", "A!B!&", "AB|C&", "ABCD|||", "ABCD&&&", "A!B!C!||", "A!B!C!&&"]
 
@@ -246,13 +226,6 @@ checkCNFtree = zipWith (\x y -> rewriteTree (parseTree x) == parseTree y) cnfInp
 checkCNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == evalTreeSimple (parseTree y)) cnfInput cnfOutput
 
 checkCNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) cnfInput cnfOutput
-
-baz = map (showTreeRPN . rewriteTree . rewriteTree . parseTree) cnfInput
-daz = map (showTreeRPN . rewriteTree . rewriteTree . rewriteTree . parseTree) cnfInput
-
-caz = map (showTreeRPN . rewriteTree . parseTree) creazyTrees
-
-jaz = map (showTreeRPN . rewriteTree2 . parseTree) cnfInput
 
 runTests = do
   putStrLn $ "testing RPN print from parsed AST       : " <> pass checkShowRPN
