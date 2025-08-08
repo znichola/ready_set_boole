@@ -1,4 +1,7 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
+import Control.Monad (when)
+import Data.Function ((&))
+import Data.ByteString (group)
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
@@ -6,24 +9,17 @@ type Rule = Tree Char -> Maybe (Tree Char)
 
 conjunctive_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
 
--- testing values
-
 -- rewriting the tree
-
--- rewriteTree :: [Rule] -> Tree Char ->
-
 
 ruleSet =
   [ eliminationOfDoubleNegative
     ,deMorgansLawAnd
     ,deMorgansLawOr
     ,materialCondition
-    ,equivilence
+    ,equivilenceSimplified
     ,removeXor
     ,distributivityAnd'
-    ,distributivityOr'
-    ,moveAndLeft
-    ,moveOrLeft
+    ,distributivityOr
     ]
 
 rewriteTree = rewriteTreeTopDown ruleSet
@@ -65,6 +61,27 @@ applyRules (rule : xs) tree =
 
 -- rewrite rules
 
+leftLean :: Tree Char -> Tree Char
+leftLean tree = let
+  flattened = splat [] tree
+  reBalanced = shiftLeft $ reverse flattened
+  in
+    head reBalanced
+    where
+    splat xs (Binary '|' a b) = splat [] a <> splat [] b <> xs
+    splat xs tree = tree : xs
+
+    shiftLeft [] = error "Cannot left lean an empty list"
+    shiftLeft [one] = [one]
+    shiftLeft (x:y:ss) = shiftLeft $ Binary '|' y x : ss
+
+-- testing values
+
+a = parseTree "AB|C|D|"
+
+b = leftLean a
+
+
 eliminationOfDoubleNegative (Unary '!' (Unary '!' a)) = Just a
 eliminationOfDoubleNegative _ = Nothing
 
@@ -91,11 +108,6 @@ equivilenceSimplified _ = Nothing
 equivilence (Binary '=' a b) = Just $ Binary '&' (Binary '>' a b) (Binary '>' a b)
 equivilence _ = Nothing
 
--- ( (A|B) & !A ) | ( (A|B) & !B )
--- (A|B) & (!A | !B)
-
--- A XOR B = (A OR B) AND (NOT A | NOT B)
-
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
 -- removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Unary '!' (Binary '&' a b ))
 removeXor _ = Nothing
@@ -112,15 +124,6 @@ distributivityOr _ = Nothing
 
 distributivityOr' (Binary '&' (Binary '|' a b) (Binary '|' a' c)) | a == a' = Just $ Binary '|' a (Binary '&' b c)
 distributivityOr' _ = Nothing
-
-moveAndLeft (Binary '&' (Binary '&' (Nullary a) (Nullary b)) (Nullary c)) = Just $ Binary '&' (Nullary a) (Binary '&' (Nullary b) (Nullary c))
-moveAndLeft _ = Nothing
-
-moveOrLeft (Binary '|' (Binary '|' (Nullary a) (Nullary b)) (Nullary c)) = Just $ Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))
-moveOrLeft _ = Nothing
-
-moveOrLeft2 (Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))) =  Just $ Binary '|' (Nullary a) (Binary '|' (Nullary b) (Nullary c))
-moveOrLeft2 _ = Nothing
 
 -- parsing the tree
 
@@ -252,11 +255,9 @@ caz = map (showTreeRPN . rewriteTree . parseTree) creazyTrees
 jaz = map (showTreeRPN . rewriteTree2 . parseTree) cnfInput
 
 runTests = do
-  putStrLn $ "testing RPN print from parsed AST   : " <> pass checkShowRPN
-  -- putStrLn $ "NNF testing binary result after rewrite : " <> pass checkNNFtree
+  putStrLn $ "testing RPN print from parsed AST       : " <> pass checkShowRPN
   putStrLn $ "NNF testing bools result after rewrite  : " <> pass checkNNFbools
-  -- putStrLn $ "NNF testing string result after rewrite : " <> pass checkNNFstring
-  putStrLn $ "CNF testing binary result after rewrite : " <> pass checkCNFtree
+  putStrLn $ "CNF testing tree result after rewrite   : " <> pass checkCNFtree
   putStrLn $ "CNF testing bools result after rewrite  : " <> pass checkCNFbools
   putStrLn $ "CNF testing string result after rewrite : " <> pass checkCNFstring
   where
