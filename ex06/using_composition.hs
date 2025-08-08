@@ -4,9 +4,9 @@ import Data.Function ((&))
 import Data.ByteString (group)
 import Debug.Trace
 
-data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
+data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
-type Rule = Tree Char -> Maybe (Tree Char)
+type Rule = Tree -> Maybe Tree
 
 conjunctive_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
 
@@ -25,9 +25,7 @@ ruleSet =
 
 rewriteTree = rebalanceTree . rewriteTreeTopDown ruleSet
 
-rewriteTree2 = rewriteTreeBottomUp ruleSet
-
-rewriteTreeBottomUp :: [Rule] -> Tree Char -> Tree Char
+rewriteTreeBottomUp :: [Rule] -> Tree -> Tree
 rewriteTreeBottomUp _ (Nullary op) = Nullary op
 rewriteTreeBottomUp rules (Unary op t) =
   let t' = rewriteTreeBottomUp rules t
@@ -41,7 +39,7 @@ rewriteTreeBottomUp rules (Binary op l r) =
         Just res -> rewriteTreeBottomUp rules res
         Nothing -> Binary op l' r'
 
-rewriteTreeTopDown :: [Rule] -> Tree Char -> Tree Char
+rewriteTreeTopDown :: [Rule] -> Tree -> Tree
 rewriteTreeTopDown rules tree =
   let rewrite = rewriteTreeTopDown rules -- defined locally
    in case applyRules rules tree of
@@ -53,7 +51,7 @@ rewriteTreeTopDown rules tree =
             Unary op t -> Unary op (rewrite t)
             Binary op l r -> Binary op (rewrite l) (rewrite r)
 
-applyRules :: [Rule] -> Tree Char -> Maybe (Tree Char)
+applyRules :: [Rule] -> Tree -> Maybe Tree
 applyRules [] tree = Nothing
 applyRules (rule : xs) tree =
   case rule tree of
@@ -64,7 +62,6 @@ applyRules (rule : xs) tree =
 
 rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
 
-leftLeanOp :: Char -> Tree Char -> Tree Char
 leftLeanOp op tree = let
   flattened = splat [] tree
   reBalanced = shiftLeft $ reverse flattened
@@ -74,8 +71,7 @@ leftLeanOp op tree = let
     splat xs (Binary op' a b) |
       op' == op = splat [] a <> splat [] b <> xs
     splat xs tree = tree : xs -- here is where you would think this needs to be recursive,
-                              --  but no, it's fine, all other symbols are factored out at this point
-
+                              -- but no, it's fine, all other symbols are factored out at this point
     shiftLeft [] = error "Cannot left lean an empty list"
     shiftLeft [one] = [one]
     shiftLeft (x:y:ss) = shiftLeft $ Binary op y x : ss
@@ -92,10 +88,7 @@ deMorgansLawOr _ = Nothing
 materialCondition (Binary '>' a b) = Just $ Binary '|' (Unary '!' a) b
 materialCondition _ = Nothing
 
--- equivilence' (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
--- equivilence' _ = Nothing
-
--- Simplify final expression to match example and remove unwanted '>' operations (A&B)|((!A)&(!B))
+-- Simplify final expression to remove unwanted '>' ops, res: (A&B)|((!A)&(!B))
 equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
 equivilenceSimplified _ = Nothing
 
@@ -103,7 +96,6 @@ equivilence (Binary '=' a b) = Just $ Binary '&' (Binary '>' a b) (Binary '>' a 
 equivilence _ = Nothing
 
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
--- removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Unary '!' (Binary '&' a b ))
 removeXor _ = Nothing
 
 distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
