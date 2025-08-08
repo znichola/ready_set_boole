@@ -67,9 +67,9 @@ mergeCol = zipWith (\a b -> a <> [b])
 
 -- unit tests
 
-satInput = ["AB|", "AB&", "AA!&", "AA^"]
+satInput = ["AB|", "AB&", "AA!&", "AA^", "AA!&", "AB^", "AA^", "AA!>", "AB=", "AB&A!B!&&", "ABCDE&&&&", "ABCDE^^^^"]
 
-satOutput = [True, True, False, False]
+satOutput = [True, True, False, False, False, True, False, True, True, False, True, True]
 
 checkSat = zipWith (\x y -> sat x == y) satInput satOutput
 
