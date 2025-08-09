@@ -1,5 +1,3 @@
-module Multiplier where
-
 import Data.Bits (shiftL, shiftR, xor, (.&.))
 import Data.Word (Word32)
 
@@ -19,18 +17,17 @@ adder = go
 -- reference impletmentation
 
 -- unsigned int mult(x, y)
--- unsigned int x, y;
 -- {
---     unsigned int reg = 0;
+--     unsigned int res = 0;
 
 --     while (y != 0)
 --     {
 --         if (y & 1)
 --         {
---             reg += x;
+--             res += x;
 --         }
 --         x <<= 1;
 --         y >>= 1;
 --     }
---     return reg;
+--     return res;
 -- }

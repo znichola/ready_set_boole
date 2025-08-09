@@ -1,8 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use camelCase" #-}
-module Gray_code where
-
 import Data.Binary (Word32)
 import Data.Bits (shiftR, xor)
 

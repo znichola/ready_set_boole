@@ -2,6 +2,7 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
+negation_normal_form :: [Char] -> IO ()
 negation_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
 
 doNothing = putStrLn . showTreeRPN . parseTree

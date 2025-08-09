@@ -2,12 +2,12 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 import Control.Monad (when)
 import Data.Function ((&))
 import Data.ByteString (group)
-import Debug.Trace
 
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
 type Rule = Tree -> Maybe Tree
 
+conjunctive_normal_form :: [Char] -> IO ()
 conjunctive_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
 
 -- rewriting the tree

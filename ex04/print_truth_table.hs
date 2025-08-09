@@ -4,6 +4,7 @@ data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
 
 data Packet a b = Op a | Value b deriving (Show)
 
+print_truth_table :: [Char] -> IO ()
 print_truth_table input =
   do
     putStrLn $ showLine vars <> " = |"
