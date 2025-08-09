@@ -1,70 +1,119 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
-import Data.List.NonEmpty (NonEmpty(..))
+import Control.Monad (when)
+import Data.Function ((&))
+import Data.ByteString (group)
+import Debug.Trace
 
-data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
+data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
+
+type Rule = Tree -> Maybe Tree
 
 conjunctive_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
 
-doNothing = putStrLn . showTreeRPN . parseTree
-
-print_truth_table input =
-  do
-    putStrLn $ showLine vars <> " = |"
-    putStrLn $ showSeperator (length vars + 1)
-    putStr $ showSquare res
-  where
-    tree = parseTree input
-    vars = evalVars tree
-    bol = genBoolTable $ length vars
-    resCol = evalTree vars bol tree
-    res = mergeCol bol resCol
-
--- testing values
-
-t = parseTree "AB>"
-
-v = evalVars t
-
-b = genBoolTable $ length v
-
 -- rewriting the tree
 
-rewriteTree (Nullary term) = Nullary term
-rewriteTree (Unary op a) =
-  case (op, a) of
-    -- Elimination of double negation
-    ('!', Unary '!' a) -> rewriteTree a
-    -- De Morgan’s laws: or
-    ('!', Binary '|' a b) -> rewriteTree (Binary '&' (Unary '!' a) (Unary '!' b))
-    -- De Morgan’s laws: and
-    ('!', Binary '&' a b) -> rewriteTree (Binary '|' (Unary '!' a) (Unary '!' b))
-    _ -> Unary op (rewriteTree a)
-rewriteTree (Binary op a b) =
-  case (op, a, b) of
-    -- Material conditions
-    ('>', a, b) -> rewriteTree (Binary '|' (Unary '!' a) b)
-    -- Equivalence
-    -- ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
-    -- Equivalence' to match example and remove unwanted > operations (A&B)|((!A)&(!B))
-    ('=', a, b) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b)))
-    -- Distributivity: and
-    -- ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
-    -- Distributivity: and'
-    ('|', Binary '&' a b, Binary '&' a' c) | a == a' -> rewriteTree (Binary '&' a (Binary '|' b c))
-    -- Distributivity: or
-    ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
-    -- Distributivity: or'
-    -- ('&', Binary '|' a b, Binary '|' a' c) | a == a' -> rewriteTree (Binary '|' a (Binary '&' b c))
-    -- enabeling both of these causes an infinate loop where more and more ops get added
-    _ -> Binary op (rewriteTree a) (rewriteTree b)
+ruleSet =
+  [ eliminationOfDoubleNegative
+    ,deMorgansLawAnd
+    ,deMorgansLawOr
+    ,materialCondition
+    ,equivilenceSimplified
+    ,removeXor
+    ,distributivityAnd'
+    ,distributivityOr
+    ]
+
+rewriteTree = rebalanceTree . rewriteTreeTopDown ruleSet
+
+rewriteTreeBottomUp :: [Rule] -> Tree -> Tree
+rewriteTreeBottomUp _ (Nullary op) = Nullary op
+rewriteTreeBottomUp rules (Unary op t) =
+  let t' = rewriteTreeBottomUp rules t
+   in case applyRules rules (Unary op t') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Unary op t'
+rewriteTreeBottomUp rules (Binary op l r) =
+  let l' = rewriteTreeBottomUp rules l
+      r' = rewriteTreeBottomUp rules r
+   in case applyRules rules (Binary op l' r') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Binary op l' r'
+
+rewriteTreeTopDown :: [Rule] -> Tree -> Tree
+rewriteTreeTopDown rules tree =
+  let rewrite = rewriteTreeTopDown rules -- defined locally
+   in case applyRules rules tree of
+        Just tree' -> rewrite tree' -- tree changes on this "level", re-run it through the rules
+        Nothing ->
+          -- tree does not change, apply rules to children
+          case tree of
+            Nullary t -> Nullary t
+            Unary op t -> Unary op (rewrite t)
+            Binary op l r -> Binary op (rewrite l) (rewrite r)
+
+applyRules :: [Rule] -> Tree -> Maybe Tree
+applyRules [] tree = Nothing
+applyRules (rule : xs) tree =
+  case rule tree of
+    Just t' -> Just t'
+    Nothing -> applyRules xs tree
+
+-- rewrite rules
+
+rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
+
+leftLeanOp op tree = let
+  flattened = splat [] tree
+  reBalanced = shiftLeft $ reverse flattened
+  in
+    head reBalanced
+    where
+    splat xs (Binary op' a b) |
+      op' == op = splat [] a <> splat [] b <> xs
+    splat xs tree = tree : xs -- here is where you would think this needs to be recursive,
+                              -- but no, it's fine, all other symbols are factored out at this point
+    shiftLeft [] = error "Cannot left lean an empty list"
+    shiftLeft [one] = [one]
+    shiftLeft (x:y:ss) = shiftLeft $ Binary op y x : ss
+
+eliminationOfDoubleNegative (Unary '!' (Unary '!' a)) = Just a
+eliminationOfDoubleNegative _ = Nothing
+
+deMorgansLawAnd (Unary '!' (Binary '&' a b)) = Just $ Binary '|' (Unary '!' a) (Unary '!' b)
+deMorgansLawAnd _ = Nothing
+
+deMorgansLawOr (Unary '!' (Binary '|' a b)) = Just $ Binary '&' (Unary '!' a) (Unary '!' b)
+deMorgansLawOr _ = Nothing
+
+materialCondition (Binary '>' a b) = Just $ Binary '|' (Unary '!' a) b
+materialCondition _ = Nothing
+
+-- Simplify final expression to remove unwanted '>' ops, res: (A&B)|((!A)&(!B))
+equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
+equivilenceSimplified _ = Nothing
+
+equivilence (Binary '=' a b) = Just $ Binary '&' (Binary '>' a b) (Binary '>' a b)
+equivilence _ = Nothing
+
+removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
+removeXor _ = Nothing
+
+distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
+distributivityAnd _ = Nothing
+
+-- the inverse is usefull for simplifying the expression!
+distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' c)) | a == a' = Just $ Binary '&' a (Binary '|' b c)
+distributivityAnd' _ = Nothing
+
+distributivityOr (Binary '|' a (Binary '&' b c)) = Just $ Binary '&' (Binary '|' a b) (Binary '|' a c)
+distributivityOr _ = Nothing
+
+distributivityOr' (Binary '&' (Binary '|' a b) (Binary '|' a' c)) | a == a' = Just $ Binary '|' a (Binary '&' b c)
+distributivityOr' _ = Nothing
 
 -- parsing the tree
 
-head' []  = error "stack must contain at least one elment"
-head' [t] = t
-head' t   = error "should only contain one tree in the end"
-
-parseTree = head' . go []
+parseTree = head . go []
   where
     go [t] [] = [t]
     go _ [] = error "stack should only contain one element at the end"
@@ -74,7 +123,7 @@ parseTerm term stack | term `elem` ['A' .. 'Z'] = Nullary term : stack
 parseTerm term [] = error ("no value to do op \'" ++ [term] ++ "\'")
 parseTerm '!' (x : stack) = Unary '!' x : stack
 parseTerm term [_] = error ("not enough values to do op \'" ++ [term] ++ "\'")
-parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack
+parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack -- reverse order to postfix, aka RPN notation
 parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
@@ -136,23 +185,11 @@ showTree tree = (\x -> if length x >= 3 then init $ tail x else x) $ go tree
 
 showStrip s = [x | x <- show s, x `notElem` "\'\""]
 
-showSquare = foldr (\x -> (<>) (showLine (convertBool x) <> "\n")) []
-
-convertBool x = [(if y then '1' else '0') | y <- x]
-
-showLine arr = "|" <> foldr (\x -> (<>) (" " <> [x] <> " |")) "" arr
-
-showSeperator n = "|" <> concat (replicate n "---|")
-
-putSquare header =
-  do
-    putStrLn $ showLine header <> " = |"
-    putStrLn $ showSeperator (length header + 1)
-    putStr $ showSquare $ genBoolTable (length header)
-
 -- unit testing
 
-cnfInput = ["AB&!", "AB|!", "AB|C&", "AB|C|D|", "AB&C&D&", "AB&!C!|", "AB|!C!&"]
+cnfInput = ["AB&!", "AB|!", "AB|C&", "AB|C|D|", "AB&C&D&", "AB&!C!|", "AB|!C!&", "ABCD&|&"]
+
+realOutput = ["A!B!|", "A!B!&", "AB|C&", "AB|C|D|", "AB&C&D&", "A!B!|C!|", "A!B!&C!&", "ABC|BD|&&"]
 
 cnfOutput = ["A!B!|", "A!B!&", "AB|C&", "ABCD|||", "ABCD&&&", "A!B!C!||", "A!B!C!&&"]
 
@@ -182,13 +219,10 @@ checkCNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == e
 
 checkCNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) cnfInput cnfOutput
 
-
 runTests = do
-  putStrLn $ "testing RPN print from parsed AST   : " <> pass checkShowRPN
-  -- putStrLn $ "NNF testing binary result after rewrite : " <> pass checkNNFtree
+  putStrLn $ "testing RPN print from parsed AST       : " <> pass checkShowRPN
   putStrLn $ "NNF testing bools result after rewrite  : " <> pass checkNNFbools
-  -- putStrLn $ "NNF testing string result after rewrite : " <> pass checkNNFstring
-  putStrLn $ "CNF testing binary result after rewrite : " <> pass checkCNFtree
+  putStrLn $ "CNF testing tree result after rewrite   : " <> pass checkCNFtree
   putStrLn $ "CNF testing bools result after rewrite  : " <> pass checkCNFbools
   putStrLn $ "CNF testing string result after rewrite : " <> pass checkCNFstring
   where
