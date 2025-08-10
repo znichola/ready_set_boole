@@ -2,7 +2,7 @@ import Data.Binary (Word32)
 import Data.Bits (shiftR, xor)
 
 grey_code :: Word32 -> Word32
-grey_code num = xor num (shiftR num 1)
+grey_code num = num `xor` shiftR num 1
 
 -- reference implementation
 

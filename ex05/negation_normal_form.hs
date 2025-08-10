@@ -67,11 +67,13 @@ parseTree = head . go []
     go stack (t : xt) = go (parseTerm t stack) xt
 
 parseTerm term stack | term `elem` ['A' .. 'Z'] = Nullary term : stack
-parseTerm term [] = error ("no value to do op \'" ++ [term] ++ "\'")
+parseTerm term []
+  | term `elem` "!&|^>=" = error ("No value to do op \'" ++ [term] ++ "\'")
 parseTerm '!' (x : stack) = Unary '!' x : stack
-parseTerm term [_] = error ("not enough values to do op \'" ++ [term] ++ "\'")
+parseTerm term [_]
+  | term `elem` "&|^>=" = error ("Not enough values to do op \'" ++ [term] ++ "\'")
 parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack
-parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
+parseTerm c _ = error ("Unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
 

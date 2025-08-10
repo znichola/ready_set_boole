@@ -22,17 +22,19 @@ print_truth_table input =
 parseTree = head . go []
   where
     go [t] [] = [t]
-    go _ [] = error "stack should only contain one element at the end"
+    go stack [] = error "Stack should only contain one element at the end"
     go stack (c : xc) = go (parseOp c stack) xc
 
 parseOp val x
   | val `elem` ['A' .. 'Z'] = Node (Value val) Empty Empty : x
-parseOp op [] = error ("no value to do op \'" ++ [op] ++ "\'")
+parseOp op []
+  | op `elem` "!&|^>=" = error ("No value to do op \'" ++ [op] ++ "\'")
 parseOp '!' (x : xs) = Node (Op '!') x Empty : xs
-parseOp op [_] = error ("not enough values to do op \'" ++ [op] ++ "\'")
+parseOp op [_]
+  | op `elem` "&|^>=" = error ("Not enough values to do op \'" ++ [op] ++ "\'")
 parseOp op (a : b : xab)
   | op `elem` "&|^>=" = Node (Op op) b a : xab
-parseOp c _ = error ("unknown character \'" ++ [c] ++ "\' found")
+parseOp c _ = error ("Unknown character \'" ++ [c] ++ "\' found")
 
 -- evaluating the tree
 

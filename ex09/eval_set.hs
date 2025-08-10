@@ -139,9 +139,11 @@ parseTree = head . go []
     go stack (t : xt) = go (parseTerm t stack) xt
 
 parseTerm term stack | term `elem` ['A' .. 'Z'] = Nullary term : stack
-parseTerm term [] = error ("no value to do op \'" ++ [term] ++ "\'")
+parseTerm term []
+  | term `elem` "!&|^>=" = error ("No value to do op \'" ++ [term] ++ "\'")
 parseTerm '!' (x : stack) = Unary '!' x : stack
-parseTerm term [_] = error ("not enough values to do op \'" ++ [term] ++ "\'")
+parseTerm term [_]
+  | term `elem` "&|^>=" = error ("Not enough values to do op \'" ++ [term] ++ "\'")
 parseTerm term (x : y : stack) | term `elem` "&|^>=" = Binary term y x : stack -- reverse order to postfix, aka RPN notation
 parseTerm c _ = error ("unknown character \'" ++ [c] ++ "\' found")
 
@@ -168,9 +170,12 @@ formulaInput =
     "AB|",
     "ABC||",
     "ABC||",
+    "ABC&&",
     "A!",
     "A!B&",
-    "A!BC|>B="
+    "A!BC|>B=",
+    "ABC^^",
+    "ABC>>"
   ]
 
 setInput =
@@ -178,9 +183,12 @@ setInput =
     [[0, 1, 2], [3, 4, 5]],
     [[], [], []],
     [[1], [2], [3]],
+    [[0], [0], []],
     [[0, 1, 2]],
     [[1, 2, 3], [2, 3, 4]],
-    [[0, 1, 2, 4, 5], [-1, 0, 2], [4, 9]]
+    [[0, 1, 2, 4, 5], [-1, 0, 2], [4, 9]],
+    [[0],[0],[0]],
+    [[0],[0],[0]]
   ]
 
 evalOutput =
@@ -189,8 +197,11 @@ evalOutput =
     [],
     [1, 2, 3],
     [],
+    [],
     [4],
-    [-1, 0, 2] -- i trust in my answer
+    [-1, 0, 2], -- i trust in my answer
+    [0],
+    [0]
   ]
 
 checkEval =
@@ -198,7 +209,7 @@ checkEval =
     ( \x y z ->
         (eval_set x y == z)
           || trace
-            ("\nEXPECTED\n" ++ show z ++ "\nACTUAL\n" ++ show (eval_set x y))
+            ("\nFOR \"" ++ x ++ "\"\nEXPECTED\n" ++ show z ++ "\nACTUAL\n" ++ show (eval_set x y))
             False
     )
     formulaInput

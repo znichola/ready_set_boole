@@ -7,9 +7,6 @@ powerset (e : t) =
   let t' = powerset t
    in t' <> [e : e' | e' <- t']
 
--- see wikipedia for the recursive definition of a powerset
--- https://en.wikipedia.org/wiki/Power_set#Recursive_definition
-
 powerset' s = sortBy compare' $ powerset s
 
 compare' x y =

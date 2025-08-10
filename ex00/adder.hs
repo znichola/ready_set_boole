@@ -7,7 +7,7 @@ adder :: Word32 -> Word32 -> Word32
 adder = go
   where
     go a 0 = a
-    go a b = go (xor a b) (shiftL carry 1) where carry = a .&. b
+    go a b = go (a `xor` b) (shiftL carry 1) where carry = a .&. b
 
 -- reference impletmentation
 
