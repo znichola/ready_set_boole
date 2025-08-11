@@ -1,11 +1,10 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
-import Distribution.Compat.CharParsing (oneOf)
 
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
 data Packet a b = Op a | Value b deriving (Show)
 
-sat :: String -> Bool
+sat :: [Char] -> Bool
 sat = or . evalRPN
 
 -- parsing the tree

@@ -2,10 +2,8 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
-negation_normal_form :: [Char] -> IO ()
-negation_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
-
-doNothing = putStrLn . showTreeRPN . parseTree
+negation_normal_form :: [Char] -> [Char]
+negation_normal_form = showTreeRPN . rewriteTree . parseTree
 
 print_truth_table input =
   do
@@ -56,6 +54,14 @@ rewriteTree (Binary op a b) =
     -- Distributivity: or'
     -- ('&', Binary '|' a b, Binary '|' a' c) | a == a' -> rewriteTree (Binary '|' a (Binary '&' b c))
     -- enabeling both of these causes an infinate loop where more and more ops get added
+    -- Remove Xor
+    ('^', a, b) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b)))
+
+-- "!( (B|C) & ( (!B) | (!C) ) )"
+
+-- TODO fix this error case, with the ! not being exactly next to the terms : ABC^^
+
+
     _ -> Binary op (rewriteTree a) (rewriteTree b)
 
 -- parsing the tree

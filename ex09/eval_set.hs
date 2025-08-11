@@ -7,6 +7,8 @@ import Data.Set qualified as Set
 import Data.Tuple (fst, snd)
 import Debug.Trace (trace)
 
+-- TODO : REWRITE to not use Sets as they are a math funciton!
+
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
 type Rule = Tree -> Maybe Tree

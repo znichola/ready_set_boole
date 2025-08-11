@@ -1,14 +1,13 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
-import Control.Monad (when)
-import Data.Function ((&))
-import Data.ByteString (group)
+import Data.Maybe (fromJust)
+import Debug.Trace (trace)
 
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
 type Rule = Tree -> Maybe Tree
 
-conjunctive_normal_form :: [Char] -> IO ()
-conjunctive_normal_form = putStrLn . showTreeRPN . rewriteTree . parseTree
+conjunctive_normal_form :: [Char] -> [Char]
+conjunctive_normal_form = showTreeRPN . rewriteTree . parseTree
 
 -- rewriting the tree
 
@@ -23,7 +22,7 @@ ruleSet =
     ,distributivityOr
     ]
 
-rewriteTree = rebalanceTree . rewriteTreeTopDown ruleSet
+rewriteTree = rebalanceTree . rewriteTreeBottomUp ruleSet
 
 rewriteTreeBottomUp :: [Rule] -> Tree -> Tree
 rewriteTreeBottomUp _ (Nullary op) = Nullary op
@@ -39,17 +38,23 @@ rewriteTreeBottomUp rules (Binary op l r) =
         Just res -> rewriteTreeBottomUp rules res
         Nothing -> Binary op l' r'
 
+-- must always be bottom up, if it's not then we can deam a tree level to be OK,
+-- except further simplificaiton can render a parent simplificaiton possible.
+-- this super annoying example shows this, AB>!, when simplified, the not is left as the outer OP,
+-- it's only once hte innder AB> is simplified to A!B| that it becomes apparant that it's possible to simplify
+-- the outer not to give a final expression, AB!&
+
 rewriteTreeTopDown :: [Rule] -> Tree -> Tree
 rewriteTreeTopDown rules tree =
   let rewrite = rewriteTreeTopDown rules -- defined locally
-   in case applyRules rules tree of
-        Just tree' -> rewrite tree' -- tree changes on this "level", re-run it through the rules
+   in case trace ("\n{" <> showTree tree <> "}\n") applyRules rules tree of
+        Just tree' -> rewriteTreeTopDown rules tree' -- tree changes on this "level", re-run it through the rules
         Nothing ->
           -- tree does not change, apply rules to children
           case tree of
             Nullary t -> Nullary t
-            Unary op t -> Unary op (rewrite t)
-            Binary op l r -> Binary op (rewrite l) (rewrite r)
+            Unary op t -> Unary op (rewriteTreeTopDown rules t)
+            Binary op l r -> Binary op (rewriteTreeTopDown rules l) (rewriteTreeTopDown rules r)
 
 applyRules :: [Rule] -> Tree -> Maybe Tree
 applyRules [] tree = Nothing
@@ -97,6 +102,11 @@ equivilence _ = Nothing
 
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
 removeXor _ = Nothing
+
+-- TODO fix this error case, with the ! not being exactly next to the terms : ABC^^
+-- other examples , "AB^|", "ABC^&!"
+
+-- !( (B|C) & ((!B)|(!C)))
 
 distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
 distributivityAnd _ = Nothing
@@ -221,11 +231,17 @@ checkCNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == e
 
 checkCNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) cnfInput cnfOutput
 
+extraInput = ["AB>!"]
+extraOutput = ["AB!&"]
+
+checkExtraString = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) extraInput extraOutput
+
 runTests = do
   putStrLn $ "testing RPN print from parsed AST       : " <> pass checkShowRPN
   putStrLn $ "NNF testing bools result after rewrite  : " <> pass checkNNFbools
   putStrLn $ "CNF testing tree result after rewrite   : " <> pass checkCNFtree
   putStrLn $ "CNF testing bools result after rewrite  : " <> pass checkCNFbools
   putStrLn $ "CNF testing string result after rewrite : " <> pass checkCNFstring
+  putStrLn $ "Special case of the fuck this project   : " <> pass checkExtraString
   where
     pass v = if and v then "Pass" else "Fail"
