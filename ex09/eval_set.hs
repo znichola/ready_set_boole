@@ -1,9 +1,6 @@
-import Data.ByteString (group)
-import Data.Function ((&))
+import Data.List (group, intersect, sort)
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
-import Data.Set (Set, difference, intersection, union)
-import Data.Set qualified as Set
 import Data.Tuple (fst, snd)
 import Debug.Trace (trace)
 
@@ -17,12 +14,12 @@ eval_set :: [Char] -> [[Int]] -> [Int]
 eval_set expr sets =
   let vars = getVars expr
       tree = rewriteTree $ parseTree expr
-      setMap = Map.fromList $ zip ('u' : getVars expr) (map Set.fromList (concat sets : sets))
-   in Set.toList $ evalTree setMap tree
+      setMap = Map.fromList $ zip ('u' : getVars expr) (map unique (concat sets : sets))
+   in evalTree setMap tree
 
 -- evaluating the tree
 
-evalTree :: Map Char (Set Int) -> Tree -> Set Int
+evalTree :: Map Char [Int] -> Tree -> [Int]
 evalTree setMap (Nullary var) =
   case setMap !? var of
     Just res -> res
@@ -30,22 +27,27 @@ evalTree setMap (Nullary var) =
 evalTree setMap (Unary op a) = eval op (evalTree setMap (Nullary 'u')) (evalTree setMap a)
 evalTree setMap (Binary op a b) = eval op (evalTree setMap a) (evalTree setMap b)
 
-eval '|' = union
-eval '&' = intersection
-eval '!' = difference
+eval '|' a b = unique $ a <> b
+eval '&' a b = intersection a b
+eval '!' a b = difference a b
 
 -- utility function
 
-getVars :: [Char] -> [Char]
 getVars = unique . filter (\x -> x `elem` ['A' .. 'Z'])
-  where
-    unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
 
-setMap :: [Char] -> [[Int]] -> Map Char (Set Int)
-setMap exp sets = Map.fromList $ zip ('u' : getVars exp) (map Set.fromList (concat sets : sets))
+unique l = map head (group $ sort l)
 
--- rewrite the tree, to remove ops that are annoying to do on sets,
--- eg implies as this needs to know a third variable, the universe of possible numbers
+-- unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
+
+intersection [] _ = []
+intersection (x : xs) ys
+  | x `elem` ys = x : intersection xs ys
+  | otherwise = intersection xs ys
+
+difference [] _ = []
+difference (x : xs) ys
+  | x `notElem` ys = x : difference xs ys
+  | otherwise = difference xs ys
 
 ruleSet =
   [ eliminationOfDoubleNegative,
@@ -181,8 +183,8 @@ setInput =
     [[0, 1, 2]],
     [[1, 2, 3], [2, 3, 4]],
     [[0, 1, 2, 4, 5], [-1, 0, 2], [4, 9]],
-    [[0],[0],[0]],
-    [[0],[0],[0]]
+    [[0], [0], [0]],
+    [[0], [0], [0]]
   ]
 
 evalOutput =
@@ -201,7 +203,7 @@ evalOutput =
 checkEval =
   zipWith3
     ( \x y z ->
-        (eval_set x y == z)
+        eval_set x y == z
           || trace
             ("\nFOR \"" ++ x ++ "\"\nEXPECTED\n" ++ show z ++ "\nACTUAL\n" ++ show (eval_set x y))
             False
@@ -210,7 +212,6 @@ checkEval =
     setInput
     evalOutput
 
-runTests = do
-  putStrLn $ "testing sat for previous examples : " <> pass checkEval
+runTests = putStrLn $ "testing sat for previous examples : " <> pass checkEval
   where
     pass v = if and v then "Pass" else "Fail"
