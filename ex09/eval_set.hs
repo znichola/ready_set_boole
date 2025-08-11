@@ -58,19 +58,21 @@ ruleSet =
     distributivityOr
   ]
 
-rewriteTree = rebalanceTree . rewriteTreeTopDown ruleSet
+rewriteTree = rebalanceTree . rewriteTreeBottomUp ruleSet
 
-rewriteTreeTopDown :: [Rule] -> Tree -> Tree
-rewriteTreeTopDown rules tree =
-  let rewrite = rewriteTreeTopDown rules -- defined locally
-   in case applyRules rules tree of
-        Just tree' -> rewrite tree' -- tree changes on this "level", re-run it through the rules
-        Nothing ->
-          -- tree does not change, apply rules to children
-          case tree of
-            Nullary t -> Nullary t
-            Unary op t -> Unary op (rewrite t)
-            Binary op l r -> Binary op (rewrite l) (rewrite r)
+rewriteTreeBottomUp :: [Rule] -> Tree -> Tree
+rewriteTreeBottomUp _ (Nullary op) = Nullary op
+rewriteTreeBottomUp rules (Unary op t) =
+  let t' = rewriteTreeBottomUp rules t
+   in case applyRules rules (Unary op t') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Unary op t'
+rewriteTreeBottomUp rules (Binary op l r) =
+  let l' = rewriteTreeBottomUp rules l
+      r' = rewriteTreeBottomUp rules r
+   in case applyRules rules (Binary op l' r') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Binary op l' r'
 
 applyRules :: [Rule] -> Tree -> Maybe Tree
 applyRules [] tree = Nothing
@@ -109,18 +111,11 @@ deMorgansLawOr _ = Nothing
 materialCondition (Binary '>' a b) = Just $ Binary '|' (Unary '!' a) b
 materialCondition _ = Nothing
 
--- Simplify final expression to remove unwanted '>' ops, res: (A&B)|((!A)&(!B))
 equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
 equivilenceSimplified _ = Nothing
 
-equivilence (Binary '=' a b) = Just $ Binary '&' (Binary '>' a b) (Binary '>' a b)
-equivilence _ = Nothing
-
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
 removeXor _ = Nothing
-
-distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
-distributivityAnd _ = Nothing
 
 -- the inverse is usefull for simplifying the expression!
 distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' c)) | a == a' = Just $ Binary '&' a (Binary '|' b c)
@@ -128,9 +123,6 @@ distributivityAnd' _ = Nothing
 
 distributivityOr (Binary '|' a (Binary '&' b c)) = Just $ Binary '&' (Binary '|' a b) (Binary '|' a c)
 distributivityOr _ = Nothing
-
-distributivityOr' (Binary '&' (Binary '|' a b) (Binary '|' a' c)) | a == a' = Just $ Binary '|' a (Binary '&' b c)
-distributivityOr' _ = Nothing
 
 -- parsing the tree
 
