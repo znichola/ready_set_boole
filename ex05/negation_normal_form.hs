@@ -2,6 +2,8 @@ import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 
 data Tree a = Nullary a | Unary a (Tree a) | Binary a (Tree a) (Tree a) deriving (Show, Eq)
 
+type Rule = Tree Char -> Maybe (Tree Char)
+
 negation_normal_form :: [Char] -> [Char]
 negation_normal_form = showTreeRPN . rewriteTree . parseTree
 
@@ -27,42 +29,76 @@ b = genBoolTable $ length v
 
 -- rewriting the tree
 
-rewriteTree (Nullary term) = Nullary term
-rewriteTree (Unary op a) =
-  case (op, a) of
-    -- Elimination of double negation
-    ('!', Unary '!' a) -> rewriteTree a
-    -- De Morgan’s laws: or
-    ('!', Binary '|' a b) -> rewriteTree (Binary '&' (Unary '!' a) (Unary '!' b))
-    -- De Morgan’s laws: and
-    ('!', Binary '&' a b) -> rewriteTree (Binary '|' (Unary '!' a) (Unary '!' b))
-    _ -> Unary op (rewriteTree a)
-rewriteTree (Binary op a b) =
-  case (op, a, b) of
-    -- Material conditions
-    ('>', a, b) -> rewriteTree (Binary '|' (Unary '!' a) b)
-    -- Equivalence
-    -- ('=', a, b) -> rewriteTree (Binary '&' (Binary '>' a b) (Binary '>' b a))
-    -- Equivalence' to match example and remove unwanted > operations (A&B)|((!A)&(!B))
-    ('=', a, b) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b)))
-    -- Distributivity: and
-    -- ('&', a, Binary '|' b c) -> rewriteTree (Binary '|' (Binary '&' a b) (Binary '&' a c))
-    -- Distributivity: or
-    -- ('|', a, Binary '&' b c) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' a c))
-    -- Distributivity: and'
-    -- ('|', Binary '&' a b, Binary '&' a' c) | a == a' -> rewriteTree (Binary '&' a (Binary '|' b c))
-    -- Distributivity: or'
-    -- ('&', Binary '|' a b, Binary '|' a' c) | a == a' -> rewriteTree (Binary '|' a (Binary '&' b c))
-    -- enabeling both of these causes an infinate loop where more and more ops get added
-    -- Remove Xor
-    ('^', a, b) -> rewriteTree (Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b)))
+rewriteTree = rebalanceTree . rewriteTreeBottomUp ruleSet
 
--- "!( (B|C) & ( (!B) | (!C) ) )"
+ruleSet =
+  [ eliminationOfDoubleNegative
+    ,deMorgansLawAnd
+    ,deMorgansLawOr
+    ,materialCondition
+    ,equivilenceSimplified
+    ,removeXor
+    ]
 
--- TODO fix this error case, with the ! not being exactly next to the terms : ABC^^
+rewriteTreeBottomUp :: [Rule] -> Tree Char -> Tree Char
+rewriteTreeBottomUp _ (Nullary op) = Nullary op
+rewriteTreeBottomUp rules (Unary op t) =
+  let t' = rewriteTreeBottomUp rules t
+   in case applyRules rules (Unary op t') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Unary op t'
+rewriteTreeBottomUp rules (Binary op l r) =
+  let l' = rewriteTreeBottomUp rules l
+      r' = rewriteTreeBottomUp rules r
+   in case applyRules rules (Binary op l' r') of
+        Just res -> rewriteTreeBottomUp rules res
+        Nothing -> Binary op l' r'
 
+applyRules :: [Rule] -> Tree Char -> Maybe (Tree Char)
+applyRules [] tree = Nothing
+applyRules (rule : xs) tree =
+  case rule tree of
+    Just t' -> Just t'
+    Nothing -> applyRules xs tree
 
-    _ -> Binary op (rewriteTree a) (rewriteTree b)
+-- rewrite rules
+
+rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
+
+leftLeanOp op tree = let
+  flattened = splat [] tree
+  reBalanced = shiftLeft $ reverse flattened
+  in
+    head reBalanced
+    where
+    splat xs (Binary op' a b) |
+      op' == op = splat [] a <> splat [] b <> xs
+    splat xs tree = tree : xs -- here is where you would think this needs to be recursive,
+                              -- but no, it's fine, all other symbols are factored out at this point
+    shiftLeft [] = error "Cannot left lean an empty list"
+    shiftLeft [one] = [one]
+    shiftLeft (x:y:ss) = shiftLeft $ Binary op y x : ss
+
+eliminationOfDoubleNegative (Unary '!' (Unary '!' a)) = Just a
+eliminationOfDoubleNegative _ = Nothing
+
+deMorgansLawAnd (Unary '!' (Binary '&' a b)) = Just $ Binary '|' (Unary '!' a) (Unary '!' b)
+deMorgansLawAnd _ = Nothing
+
+deMorgansLawOr (Unary '!' (Binary '|' a b)) = Just $ Binary '&' (Unary '!' a) (Unary '!' b)
+deMorgansLawOr _ = Nothing
+
+materialCondition (Binary '>' a b) = Just $ Binary '|' (Unary '!' a) b
+materialCondition _ = Nothing
+
+equivilenceSimplified (Binary '=' a b) = Just $ Binary '|' (Binary '&' a b) (Binary '&' (Unary '!' a) (Unary '!' b))
+equivilenceSimplified _ = Nothing
+
+removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
+removeXor _ = Nothing
+
+distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
+distributivityAnd _ = Nothing
 
 -- parsing the tree
 
@@ -156,9 +192,9 @@ putSquare header =
 
 -- unit testing
 
-nnfInput = ["AB&!", "AB|!", "AB>", "AB=", "AB|C&!"]
+nnfInput = ["AB&!", "AB|!", "AB>", "AB=", "AB|C&!", "AB>!"]
 
-nnfOutput = ["A!B!|", "A!B!&", "A!B|", "AB&A!B!&|", "A!B!&C!|"]
+nnfOutput = ["A!B!|", "A!B!&", "A!B|", "AB&A!B!&|", "A!B!&C!|", "AB!&"]
 
 ttInput = ["AB&C|", "AB&", "AB|", "AB|C&", "ABC|&"]
 
