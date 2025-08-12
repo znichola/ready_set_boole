@@ -1,6 +1,6 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 import Control.Monad.Cont (label)
-import Data.Tree (flatten)
+import Data.List (sort)
 
 data Tree a = Empty | Node a (Tree a) (Tree a) deriving (Show)
 
@@ -61,7 +61,7 @@ genBoolTable = go []
 --     f' i r = concat $ concat $ replicate r $ [replicate (2 ^ i) True] <> [replicate (2 ^ i) False]
 
 evalVariableTable :: Tree (Packet a Char) -> [Char]
-evalVariableTable = removeDuplicates . go []
+evalVariableTable = sort . removeDuplicates . go []
   where
     removeDuplicates a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
     go _ Empty = []

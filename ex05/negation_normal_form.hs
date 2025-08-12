@@ -97,9 +97,6 @@ equivilenceSimplified _ = Nothing
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
 removeXor _ = Nothing
 
-distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
-distributivityAnd _ = Nothing
-
 -- parsing the tree
 
 parseTree = head' . go []

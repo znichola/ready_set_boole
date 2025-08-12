@@ -1,6 +1,7 @@
 import Data.Bits (Bits (complement, xor, (.&.), (.|.)))
 import Data.Maybe (fromJust)
 import Debug.Trace (trace)
+import Data.List (sort)
 
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
@@ -18,6 +19,7 @@ ruleSet =
     ,materialCondition
     ,equivilenceSimplified
     ,removeXor
+    ,absobtion
     ,distributivityAnd'
     ,distributivityOr
     ]
@@ -65,7 +67,7 @@ applyRules (rule : xs) tree =
 
 -- rewrite rules
 
-rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
+rebalanceTree = leftLeanOp '&' . leftLeanOp '|'
 
 leftLeanOp op tree = let
   flattened = splat [] tree
@@ -106,20 +108,46 @@ removeXor _ = Nothing
 -- TODO fix this error case, with the ! not being exactly next to the terms : ABC^^
 -- other examples , "AB^|", "ABC^&!"
 
+-- "ABC||AB!C!||A!B!C!&B||A!B!C!&C||&&&"
+-- "XXXXX&B||A!B!C!&C||&&&"
+-- "XXXXX&B||A!B!C!&C||&&&"
+
+-- "X & ( X & ( (X | ( (X&X)|B )) & ((!A)|((X&X)|C))))"
+
+-- ()&()&()|B))&((!A)|(((!B)&(!C))|C)))
+
 -- !( (B|C) & ((!B)|(!C)))
 
+-- it's not used, there are also permutation to add for comutable versions of the expression
 distributivityAnd (Binary '&' a (Binary '|' b c)) = Just $ Binary '|' (Binary '&' a b) (Binary '&' a c)
 distributivityAnd _ = Nothing
 
--- the inverse is usefull for simplifying the expression!
-distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' c)) | a == a' = Just $ Binary '&' a (Binary '|' b c)
+-- the inverse is usefull for simplifying the expression!, also all possible permutation with the comutation rule
+distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' b'))
+  | a == a' = Just $ Binary '&' a (Binary '|' b b')
+  | a == b' = Just $ Binary '&' a (Binary '|' b a')
+  | b == a' = Just $ Binary '&' b (Binary '|' a a')
+  | b == b' = Just $ Binary '&' b (Binary '|' a b')
 distributivityAnd' _ = Nothing
 
 distributivityOr (Binary '|' a (Binary '&' b c)) = Just $ Binary '&' (Binary '|' a b) (Binary '|' a c)
+distributivityOr (Binary '|' (Binary '&' a b) c) = Just $ Binary '&' (Binary '|' a c) (Binary '|' b c)
 distributivityOr _ = Nothing
 
+-- not used, and missing comutable cases of the expression
 distributivityOr' (Binary '&' (Binary '|' a b) (Binary '|' a' c)) | a == a' = Just $ Binary '|' a (Binary '&' b c)
 distributivityOr' _ = Nothing
+
+-- a ∨ (a ∧ b) = a
+-- a ∧ (a ∨ b) = a
+absobtion (Binary '|' a (Binary '&' a' b))
+  | a == a' = Just a
+  | a == b = Just a -- comutativity, it's always possible to switch when it's ∧ and ∨
+absobtion (Binary '&' a (Binary '|' a' b))
+  | a == a' = Just a
+  | a == b = Just a
+absobtion _ = Nothing
+
 
 -- parsing the tree
 
@@ -144,7 +172,7 @@ evalRPN = evalTreeSimple . parseTree
 
 evalTreeSimple input = evalTree vars (genBoolTable $ length vars) input
   where
-    vars = evalVars input
+    vars = sort $ evalVars input
 
 evalTree vars bools (Nullary term) = getValBoolTable term vars bools
 evalTree vars bools (Unary '!' left) = map complement (evalTree vars bools left)
@@ -209,9 +237,7 @@ tail' = drop 1
 
 cnfInput = ["AB&!", "AB|!", "AB|C&", "AB|C|D|", "AB&C&D&", "AB&!C!|", "AB|!C!&", "ABCD&|&"]
 
-realOutput = ["A!B!|", "A!B!&", "AB|C&", "AB|C|D|", "AB&C&D&", "A!B!|C!|", "A!B!&C!&", "ABC|BD|&&"]
-
-cnfOutput = ["A!B!|", "A!B!&", "AB|C&", "ABCD|||", "ABCD&&&", "A!B!C!||", "A!B!C!&&"]
+cnfOutput = ["A!B!|", "A!B!&", "AB|C&", "ABCD|||", "ABCD&&&", "A!B!C!||", "A!B!C!&&", "ABC|BD|&&"]
 
 nnfInput = ["AB&!", "AB|!", "AB>", "AB=", "AB|C&!"]
 
@@ -239,10 +265,11 @@ checkCNFbools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == e
 
 checkCNFstring = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) cnfInput cnfOutput
 
-extraInput = ["AB>!"]
-extraOutput = ["AB!&"]
+extraInput = ["AB>!", "ABC&|", "ABC^^"]
+extraOutput = ["AB!&","AB|AC|&", "ABC||AB!C!||A!B!B||A!C!B||A!B!C||A!C!C||&&&&&"]
 
 checkExtraString = zipWith (\x y -> showTreeRPN (rewriteTree $ parseTree x) == y) extraInput extraOutput
+checkExtraBools = zipWith (\x y -> evalTreeSimple (rewriteTree $ parseTree x) == evalTreeSimple (parseTree y)) extraInput extraOutput
 
 runTests = do
   putStrLn $ "testing RPN print from parsed AST       : " <> pass checkShowRPN
@@ -250,6 +277,7 @@ runTests = do
   putStrLn $ "CNF testing tree result after rewrite   : " <> pass checkCNFtree
   putStrLn $ "CNF testing bools result after rewrite  : " <> pass checkCNFbools
   putStrLn $ "CNF testing string result after rewrite : " <> pass checkCNFstring
-  putStrLn $ "Special case of the fuck this project   : " <> pass checkExtraString
+  putStrLn $ "Extra string tests                      : " <> pass checkExtraString
+  putStrLn $ "Extra bools tests                       : " <> pass checkExtraBools
   where
     pass v = if and v then "Pass" else "Fail"

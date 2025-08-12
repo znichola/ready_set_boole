@@ -1,4 +1,4 @@
-import Data.List (group, intersect, sort, uncons)
+import Data.List (group, sort, uncons)
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Tuple (fst, snd)
@@ -35,8 +35,6 @@ getVars = unique . filter (\x -> x `elem` ['A' .. 'Z'])
 
 unique l = map head' (group $ sort l)
 
-
-
 intersection [] _ = []
 intersection (x : xs) ys
   | x `elem` ys = x : intersection xs ys
@@ -47,16 +45,19 @@ difference (x : xs) ys
   | x `notElem` ys = x : difference xs ys
   | otherwise = difference xs ys
 
+-- rewriting the tree
+
 ruleSet =
-  [ eliminationOfDoubleNegative,
-    deMorgansLawAnd,
-    deMorgansLawOr,
-    materialCondition,
-    equivilenceSimplified,
-    removeXor,
-    distributivityAnd',
-    distributivityOr
-  ]
+  [ eliminationOfDoubleNegative
+    ,deMorgansLawAnd
+    ,deMorgansLawOr
+    ,materialCondition
+    ,equivilenceSimplified
+    ,removeXor
+    ,absobtion
+    ,distributivityAnd'
+    ,distributivityOr
+    ]
 
 rewriteTree = rebalanceTree . rewriteTreeBottomUp ruleSet
 
@@ -83,7 +84,7 @@ applyRules (rule : xs) tree =
 
 -- rewrite rules
 
-rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
+rebalanceTree = leftLeanOp '&' . leftLeanOp '|'
 
 leftLeanOp op tree =
   let flattened = splat [] tree
@@ -93,8 +94,7 @@ leftLeanOp op tree =
     splat xs (Binary op' a b)
       | op' == op =
           splat [] a <> splat [] b <> xs
-    splat xs tree = tree : xs -- here is where you would think this needs to be recursive,
-    -- but no, it's fine, all other symbols are factored out at this point
+    splat xs tree = tree : xs
     shiftLeft [] = error "Cannot left lean an empty list"
     shiftLeft [one] = [one]
     shiftLeft (x : y : ss) = shiftLeft $ Binary op y x : ss
@@ -117,12 +117,27 @@ equivilenceSimplified _ = Nothing
 removeXor (Binary '^' a b) = Just $ Binary '&' (Binary '|' a b) (Binary '|' (Unary '!' a) (Unary '!' b))
 removeXor _ = Nothing
 
--- the inverse is usefull for simplifying the expression!
-distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' c)) | a == a' = Just $ Binary '&' a (Binary '|' b c)
+-- all possible permutation with the comutation rule
+distributivityAnd' (Binary '|' (Binary '&' a b) (Binary '&' a' b'))
+  | a == a' = Just $ Binary '&' a (Binary '|' b b')
+  | a == b' = Just $ Binary '&' a (Binary '|' b a')
+  | b == a' = Just $ Binary '&' b (Binary '|' a a')
+  | b == b' = Just $ Binary '&' b (Binary '|' a b')
 distributivityAnd' _ = Nothing
 
 distributivityOr (Binary '|' a (Binary '&' b c)) = Just $ Binary '&' (Binary '|' a b) (Binary '|' a c)
+distributivityOr (Binary '|' (Binary '&' a b) c) = Just $ Binary '&' (Binary '|' a c) (Binary '|' b c)
 distributivityOr _ = Nothing
+
+-- a ∨ (a ∧ b) = a
+-- a ∧ (a ∨ b) = a
+absobtion (Binary '|' a (Binary '&' a' b))
+  | a == a' = Just a
+  | a == b = Just a -- comutativity, it's always possible to switch when it's ∧ and ∨
+absobtion (Binary '&' a (Binary '|' a' b))
+  | a == a' = Just a
+  | a == b = Just a
+absobtion _ = Nothing
 
 -- parsing the tree
 
