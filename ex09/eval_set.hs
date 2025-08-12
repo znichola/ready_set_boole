@@ -1,10 +1,8 @@
-import Data.List (group, intersect, sort)
+import Data.List (group, intersect, sort, uncons)
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Tuple (fst, snd)
 import Debug.Trace (trace)
-
--- TODO : REWRITE to not use Sets as they are a math funciton!
 
 data Tree = Nullary Char | Unary Char Tree | Binary Char Tree Tree deriving (Show, Eq)
 
@@ -35,9 +33,9 @@ eval '!' a b = difference a b
 
 getVars = unique . filter (\x -> x `elem` ['A' .. 'Z'])
 
-unique l = map head (group $ sort l)
+unique l = map head' (group $ sort l)
 
--- unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
+
 
 intersection [] _ = []
 intersection (x : xs) ys
@@ -90,7 +88,7 @@ rebalanceTree = leftLeanOp '|' . leftLeanOp '&'
 leftLeanOp op tree =
   let flattened = splat [] tree
       reBalanced = shiftLeft $ reverse flattened
-   in head reBalanced
+   in head' reBalanced
   where
     splat xs (Binary op' a b)
       | op' == op =
@@ -128,7 +126,7 @@ distributivityOr _ = Nothing
 
 -- parsing the tree
 
-parseTree = head . go []
+parseTree = head' . go []
   where
     go [t] [] = [t]
     go _ [] = error "stack should only contain one element at the end"
@@ -151,13 +149,21 @@ showTreeRPN = go
     go (Unary op left) = go left <> [op]
     go (Binary op left right) = go left <> go right <> [op]
 
-showTree tree = (\x -> if length x >= 3 then init $ tail x else x) $ go tree
+showTree tree = (\x -> if length x >= 3 then init $ tail' x else x) $ go tree
   where
     go (Nullary v) = showStrip v
     go (Unary op left) = "(" <> showStrip op <> go left <> ")"
     go (Binary op left right) = "(" <> go left <> showStrip op <> go right <> ")"
 
 showStrip s = [x | x <- show s, x `notElem` "\'\""]
+
+-- util to remove warnings
+
+head' [] = error "Can't get head on empty list"
+head' (x:_) = x
+-- unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
+
+tail' = drop 1
 
 -- unit testing
 

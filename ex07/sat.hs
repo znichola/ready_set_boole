@@ -9,7 +9,7 @@ sat = or . evalRPN
 
 -- parsing the tree
 
-parseTree = head . go []
+parseTree = head' . go []
   where
     go [t] [] = [t]
     go _ [] = error "stack should only contain one element at the end"
@@ -65,6 +65,12 @@ getValBoolTable val values = getCol (findVal val values)
 getCol n = map (!! n)
 
 mergeCol = zipWith (\a b -> a <> [b])
+
+-- util to remove warnings
+
+head' [] = error "Can't get head on empty list"
+head' (x:_) = x
+-- unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
 
 -- unit tests
 

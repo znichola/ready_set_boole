@@ -21,7 +21,7 @@ print_truth_table input =
 
 -- parsing the tree
 
-parseTree = head . go []
+parseTree = head' . go []
   where
     go [t] [] = [t]
     go stack [] = error "Stack should only contain one element at the end"
@@ -97,6 +97,12 @@ printTree (Node (Value v) Empty Empty) = showStrip v
 printTree (Node (Op op) l r) = "(" <> printTree l <> showStrip op <> printTree r <> ")"
 
 showStrip s = stripQuotes $ show s
+
+-- util to remove warnings
+
+head' [] = error "Can't get head on empty list"
+head' (x:_) = x
+-- unique a = foldr (\x acc -> (<>) acc ([x | x `notElem` acc])) [] (reverse a)
 
 -- stripQuotes = foldr (\ x -> (<>) ([x | x `notElem` "\'\""])) []
 stripQuotes s = [x | x <- s, x `notElem` "\'\""]
